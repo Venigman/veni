@@ -9,6 +9,8 @@ export interface SavedEndpoint {
   body?: string;
   status?: EndpointStatus;
   category?: string;
+  /** Подсказка-синтаксис для path-input: "/log [since=24h] [device=<mac>]" */
+  hint?: string;
 }
 
 export interface APITab {
