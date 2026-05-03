@@ -367,16 +367,6 @@ a:hover { text-decoration: underline; }
   border-bottom: 1px solid var(--border-muted);
 }
 
-/* Подсказка-синтаксис под path-input для команд: показывает какие параметры
-   можно дописать (например "/log [since=24h] [device=<mac>] [type=<x>]"). */
-.path-hint {
-  padding: 4px 16px 0;
-  font: 11px/1.4 var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
-  color: var(--text-muted);
-  background: var(--bg-canvas);
-  user-select: text;
-}
-
 /* Превью «что улетит при Send» — тонкая полоса под path-input. */
 .send-preview {
   display: flex;

@@ -37,8 +37,6 @@ export function Workspace() {
   // Для command-mode: когда тапаешь POST endpoint с body={"command":"/X"},
   // в path-input показываем "/X", а реальный POST-путь и body-шаблон сохраняем тут.
   const [commandEndpoint, setCommandEndpoint] = useState<{ path: string; bodyTemplate: string } | null>(null);
-  // Подсказка под path-input: показывает синтаксис команды (что можно дописать).
-  const [pathHint, setPathHint] = useState<string | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
   const [running, setRunning] = useState(false);
   // Mobile-only: Request panel can be collapsed so the user can read Response
@@ -54,7 +52,6 @@ export function Workspace() {
     setMethod("GET");
     setPath("/");
     setCommandEndpoint(null);
-    setPathHint(null);
   }, [active?.id]);
 
   // Publish read/edit mode to the topbar banner via context
@@ -215,11 +212,6 @@ export function Workspace() {
           <span>{running ? "Sending…" : "Send"}</span>
         </button>
       </div>
-      {pathHint && (
-        <div className="path-hint" title="Подсказка по параметрам команды">
-          {pathHint}
-        </div>
-      )}
       {sendPreview && (
         <div className="send-preview" data-kind={sendPreview.kind}>
           <span className="send-preview-arrow">▶</span>
@@ -311,7 +303,6 @@ export function Workspace() {
                         setPath(obj.command);
                         setBody("");
                         setCommandEndpoint({ path: ep.path, bodyTemplate: ep.body });
-                        setPathHint(ep.hint || null);
                         return;
                       }
                     } catch {
@@ -322,7 +313,6 @@ export function Workspace() {
                   setPath(ep.path);
                   setBody(ep.body !== undefined ? ep.body : "");
                   setCommandEndpoint(null);
-                  setPathHint(ep.hint || null);
                 }}
               />
             )}

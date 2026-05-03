@@ -12,11 +12,6 @@ export interface PresetEndpoint {
   status?: EndpointStatus;
   /** Optional sub-category inside a preset — used to group endpoints in Workspace. */
   category?: string;
-  /**
-   * Optional usage hint shown under path-input as ghost text. Use to show
-   * what params can be appended, e.g. `/log [since=24h] [device=<mac>] [type=<x>]`.
-   */
-  hint?: string;
 }
 
 export interface APIPreset {
