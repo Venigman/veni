@@ -333,7 +333,7 @@ export function SmartViewer({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ display: "flex", gap: 4 }}>
+      <div className="viewer-tabs">
         {tabs
           .filter((t) => t.show)
           .map((t) => (
