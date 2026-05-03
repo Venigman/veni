@@ -367,6 +367,40 @@ a:hover { text-decoration: underline; }
   border-bottom: 1px solid var(--border-muted);
 }
 
+/* Авто-подсказки команд: появляются под runner когда в input есть префикс
+   совпадающий с другими endpoint'ами. Клик — подставляет полную команду. */
+.cmd-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 16px 0;
+  background: var(--bg-canvas);
+}
+.cmd-suggest-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-muted);
+  border-radius: 6px;
+  font: 11px/1.2 var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  cursor: pointer;
+  user-select: none;
+}
+.cmd-suggest-item:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-canvas);
+}
+.cmd-suggest-cmd {
+  color: var(--text-primary);
+}
+.cmd-suggest-label {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
 /* Превью «что улетит при Send» — тонкая полоса под path-input. */
 .send-preview {
   display: flex;

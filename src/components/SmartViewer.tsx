@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
   Copy,
+  Download,
+  Image as ImageIcon,
   Layers,
   Rows3,
   FileText,
@@ -14,7 +16,7 @@ import {
 } from "lucide-react";
 import { collectColumns, findPrimaryArray, previewCell } from "../lib/inspect";
 
-type ViewMode = "pretty" | "file" | "files" | "tree" | "table" | "raw";
+type ViewMode = "pretty" | "media" | "file" | "files" | "tree" | "table" | "raw";
 
 interface FileEntry {
   name: string;
@@ -115,6 +117,60 @@ interface Props {
   onNavigateFile?: (entry: FileEntry, currentRequestPath: string) => void;
   /** Текущий path запроса — нужен для навигации (хлебные крошки вверх). */
   currentRequestPath?: string;
+  /** Базовый URL текущего таба — нужен чтобы тянуть медиа (img/video/audio/pdf). */
+  apiBaseURL?: string;
+  /** Bearer-токен текущего таба — для авторизации при fetch медиа. */
+  apiToken?: string;
+}
+
+/** Возвращает media-ссылку для рендера если ответ ноды содержит kind+filename. */
+function detectMedia(value: unknown): { kind: string; filename: string; relPath: string } | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  // veni-detect формат: {ok, result: {kind, filename, ...}}
+  let inner: Record<string, unknown> = v;
+  if (typeof v.result === "object" && v.result !== null) {
+    inner = v.result as Record<string, unknown>;
+  }
+  const kind = inner.kind as string | undefined;
+  const filename = inner.filename as string | undefined;
+  if (typeof kind !== "string" || typeof filename !== "string") return null;
+  if (!["cam", "screen", "audio", "file"].includes(kind)) return null;
+  return {
+    kind,
+    filename,
+    relPath: `/api/media/${encodeURIComponent(kind)}/${encodeURIComponent(filename)}`,
+  };
+}
+
+function mimeFromName(name: string): { kind: "image" | "video" | "audio" | "pdf" | "text" | "other"; mime: string } {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  const map: Record<string, { kind: "image" | "video" | "audio" | "pdf" | "text"; mime: string }> = {
+    png: { kind: "image", mime: "image/png" },
+    jpg: { kind: "image", mime: "image/jpeg" },
+    jpeg: { kind: "image", mime: "image/jpeg" },
+    gif: { kind: "image", mime: "image/gif" },
+    webp: { kind: "image", mime: "image/webp" },
+    heic: { kind: "image", mime: "image/heic" },
+    bmp: { kind: "image", mime: "image/bmp" },
+    svg: { kind: "image", mime: "image/svg+xml" },
+    mp4: { kind: "video", mime: "video/mp4" },
+    mov: { kind: "video", mime: "video/quicktime" },
+    webm: { kind: "video", mime: "video/webm" },
+    mkv: { kind: "video", mime: "video/x-matroska" },
+    mp3: { kind: "audio", mime: "audio/mpeg" },
+    wav: { kind: "audio", mime: "audio/wav" },
+    m4a: { kind: "audio", mime: "audio/mp4" },
+    flac: { kind: "audio", mime: "audio/flac" },
+    ogg: { kind: "audio", mime: "audio/ogg" },
+    pdf: { kind: "pdf", mime: "application/pdf" },
+    txt: { kind: "text", mime: "text/plain" },
+    md: { kind: "text", mime: "text/markdown" },
+    json: { kind: "text", mime: "application/json" },
+    csv: { kind: "text", mime: "text/csv" },
+    log: { kind: "text", mime: "text/plain" },
+  };
+  return map[ext] || { kind: "other", mime: "application/octet-stream" };
 }
 
 export function SmartViewer({
@@ -122,30 +178,41 @@ export function SmartViewer({
   rawText,
   onNavigateFile,
   currentRequestPath,
+  apiBaseURL,
+  apiToken,
 }: Props) {
   const primaryArray = useMemo(() => findPrimaryArray(data), [data]);
   const humanText = useMemo(() => findHumanText(data), [data]);
   const fileContent = useMemo(() => findFileContent(data), [data]);
   const fileListing = useMemo(() => findFileListing(data), [data]);
+  const media = useMemo(() => detectMedia(data), [data]);
   const hasPretty =
     humanText !== null ||
     (data !== null &&
       data !== undefined &&
       (typeof data === "object" || typeof data === "string"));
-  // Приоритет открытия: декодированный файл → файловый листинг → pretty → table → tree.
+  // Приоритет открытия: media → file → files → pretty → table → tree.
   const [mode, setMode] = useState<ViewMode>(
-    fileContent
-      ? "file"
-      : fileListing
-        ? "files"
-        : humanText
-          ? "pretty"
-          : primaryArray
-            ? "table"
-            : "tree"
+    media && apiBaseURL
+      ? "media"
+      : fileContent
+        ? "file"
+        : fileListing
+          ? "files"
+          : humanText
+            ? "pretty"
+            : primaryArray
+              ? "table"
+              : "tree"
   );
 
   const tabs: { id: ViewMode; label: string; icon: React.ReactNode; show: boolean }[] = [
+    {
+      id: "media",
+      label: "Media",
+      icon: <ImageIcon size={13} strokeWidth={1.6} />,
+      show: !!media && !!apiBaseURL,
+    },
     {
       id: "file",
       label: "File",
@@ -212,6 +279,14 @@ export function SmartViewer({
         </button>
       </div>
 
+      {mode === "media" && media && apiBaseURL && (
+        <MediaView
+          baseURL={apiBaseURL}
+          token={apiToken}
+          relPath={media.relPath}
+          filename={media.filename}
+        />
+      )}
       {mode === "file" && fileContent && <FileView file={fileContent} />}
       {mode === "files" && fileListing && (
         <FilesView
@@ -720,5 +795,200 @@ function FilesView({
         ))}
       </div>
     </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   MEDIA VIEW — рендер картинок/видео/аудио/PDF
+   с авторизацией через Bearer-токен. Бинарь не
+   умеет авторизоваться сам через <img src>,
+   поэтому fetch'им как blob и отдаём object-URL.
+   ───────────────────────────────────────────── */
+function MediaView({
+  baseURL,
+  token,
+  relPath,
+  filename,
+}: {
+  baseURL: string;
+  token?: string;
+  relPath: string;
+  filename: string;
+}) {
+  const meta = useMemo(() => mimeFromName(filename), [filename]);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [size, setSize] = useState<number | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    let url: string | null = null;
+    const ac = new AbortController();
+    setLoading(true);
+    setErr(null);
+    setBlobUrl(null);
+    setSize(null);
+
+    const full = baseURL.replace(/\/+$/, "") + relPath;
+    fetch(full, {
+      signal: ac.signal,
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const blob = await r.blob();
+        if (cancelled) return;
+        url = URL.createObjectURL(blob);
+        setBlobUrl(url);
+        setSize(blob.size);
+        setLoading(false);
+      })
+      .catch((e) => {
+        if (cancelled || ac.signal.aborted) return;
+        setErr(e.message || String(e));
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      ac.abort();
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [baseURL, token, relPath]);
+
+  function download() {
+    if (!blobUrl) return;
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    a.click();
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          fontSize: 11,
+          color: "var(--text-muted)",
+        }}
+      >
+        <span>{filename}</span>
+        {size !== null && <span>· {formatBytes(size)}</span>}
+        <span>· {meta.kind}</span>
+        <div style={{ flex: 1 }} />
+        {blobUrl && (
+          <button
+            type="button"
+            className="btn btn--ghost"
+            style={{ height: 24, padding: "0 8px", fontSize: 11 }}
+            onClick={download}
+          >
+            <Download size={11} strokeWidth={1.8} />
+            <span style={{ marginLeft: 4 }}>Скачать</span>
+          </button>
+        )}
+      </div>
+
+      {loading && <div style={{ color: "var(--text-muted)", fontSize: 12 }}>Загружаю…</div>}
+      {err && (
+        <div
+          style={{
+            color: "var(--status-high, #ff6363)",
+            fontSize: 12,
+            padding: 8,
+            background: "var(--bg-elevated)",
+            borderRadius: 6,
+          }}
+        >
+          ❌ {err}
+        </div>
+      )}
+
+      {blobUrl && meta.kind === "image" && (
+        <img
+          src={blobUrl}
+          alt={filename}
+          style={{
+            maxWidth: "100%",
+            borderRadius: 8,
+            border: "1px solid var(--border-muted)",
+            background: "var(--bg-elevated)",
+          }}
+        />
+      )}
+      {blobUrl && meta.kind === "video" && (
+        <video
+          src={blobUrl}
+          controls
+          style={{
+            maxWidth: "100%",
+            borderRadius: 8,
+            border: "1px solid var(--border-muted)",
+            background: "#000",
+          }}
+        />
+      )}
+      {blobUrl && meta.kind === "audio" && (
+        <audio src={blobUrl} controls style={{ width: "100%" }} />
+      )}
+      {blobUrl && meta.kind === "pdf" && (
+        <iframe
+          src={blobUrl}
+          title={filename}
+          style={{
+            width: "100%",
+            height: "70vh",
+            border: "1px solid var(--border-muted)",
+            borderRadius: 8,
+            background: "var(--bg-elevated)",
+          }}
+        />
+      )}
+      {blobUrl && meta.kind === "text" && (
+        <TextBlobView blobUrl={blobUrl} />
+      )}
+      {blobUrl && meta.kind === "other" && (
+        <div
+          style={{
+            padding: 16,
+            background: "var(--bg-elevated)",
+            borderRadius: 8,
+            border: "1px solid var(--border-muted)",
+            textAlign: "center",
+            color: "var(--text-muted)",
+            fontSize: 12,
+          }}
+        >
+          Этот тип файла нельзя превьюить — нажми «Скачать» сверху.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TextBlobView({ blobUrl }: { blobUrl: string }) {
+  const [text, setText] = useState<string>("");
+  useEffect(() => {
+    let cancelled = false;
+    fetch(blobUrl)
+      .then((r) => r.text())
+      .then((t) => {
+        if (!cancelled) setText(t);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [blobUrl]);
+  return (
+    <pre
+      className="response-area"
+      style={{ margin: 0, maxHeight: "70vh", overflow: "auto" }}
+    >
+      {text}
+    </pre>
   );
 }

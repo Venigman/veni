@@ -81,6 +81,32 @@ export function Workspace() {
     return METHODS.filter((m) => used.has(m));
   }, [active, method]);
 
+  // Авто-подсказки команд: ищем в endpoints пресета те, у которых body.command
+  // начинается с того что юзер сейчас пишет. Например пишет "/devices" →
+  // показываем "/devices online", "/devices offline", "/devices banned".
+  const cmdSuggestions = useMemo(() => {
+    if (!commandEndpoint || !path || !active?.endpoints) return [];
+    const trimmed = path.trim();
+    if (trimmed.length < 1) return [];
+    const out: { ep: SavedEndpoint; cmd: string }[] = [];
+    for (const ep of active.endpoints) {
+      if (ep.method !== "POST" || typeof ep.body !== "string") continue;
+      let cmd: string;
+      try {
+        const obj = JSON.parse(ep.body);
+        if (typeof obj?.command !== "string") continue;
+        cmd = obj.command;
+      } catch {
+        continue;
+      }
+      if (cmd === trimmed) continue;
+      if (!cmd.startsWith(trimmed)) continue;
+      out.push({ ep, cmd });
+      if (out.length >= 8) break;
+    }
+    return out;
+  }, [path, active, commandEndpoint]);
+
   // Превью того, что улетит — короткая подсказка под path-input.
   const sendPreview = useMemo(() => {
     if (!body || !body.trim()) return null;
@@ -212,6 +238,27 @@ export function Workspace() {
           <span>{running ? "Sending…" : "Send"}</span>
         </button>
       </div>
+      {cmdSuggestions.length > 0 && (
+        <div className="cmd-suggest">
+          {cmdSuggestions.map(({ ep, cmd }) => (
+            <button
+              key={ep.label + cmd}
+              type="button"
+              className="cmd-suggest-item"
+              onClick={() => {
+                setMethod("POST");
+                setPath(cmd);
+                setBody("");
+                setCommandEndpoint({ path: ep.path, bodyTemplate: ep.body || "" });
+              }}
+              title={ep.label}
+            >
+              <span className="cmd-suggest-cmd">{cmd}</span>
+              <span className="cmd-suggest-label">{ep.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {sendPreview && (
         <div className="send-preview" data-kind={sendPreview.kind}>
           <span className="send-preview-arrow">▶</span>
@@ -425,6 +472,8 @@ export function Workspace() {
                 data={result.data}
                 rawText={result.rawText}
                 currentRequestPath={result.requestPath}
+                apiBaseURL={active.baseURL}
+                apiToken={active.auth?.token}
                 onNavigateFile={(entry, currentPath) => {
                   // Стратегия: меняем хвост path после `/contents/` на entry.path.
                   // Пример: /repos/o/r/contents/src/foo + entry "src/bar"
