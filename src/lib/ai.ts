@@ -153,11 +153,16 @@ export async function generatePreset(opts: GenerateOptions): Promise<{
 - baseURL: ${opts.baseURL}
 - авторизация: ${opts.authKind}${opts.authHeaderName ? ` (header: ${opts.authHeaderName})` : ""}${opts.authQueryName ? ` (query: ${opts.authQueryName})` : ""}
 
-ПРАВИЛА (важно):
-1. Используй ТОЛЬКО действительно существующие endpoints этого API. Если ты не знаешь точно что у сервиса есть REST API или сомневаешься в путях — НЕ выдумывай. Лучше вызови инструмент report_no_rest_api с объяснением.
-2. Примеры сервисов БЕЗ публичного REST API: Framer, Figma (для большинства задач), Webflow (для не-Enterprise), большинство социальных сетей без OAuth-приложения. Если baseURL похож на такой — report_no_rest_api.
-3. Если у сервиса есть REST API но ты не уверен в конкретном пути — лучше пропусти этот endpoint, чем выдумай.
-4. Только проверенные/публично-документированные endpoints (GitHub /user/repos, OpenAI /v1/chat/completions, Telegram /bot<token>/sendMessage и т.д.).
+ПРАВИЛА (КРИТИЧНО — соблюдай строго):
+1. Используй ТОЛЬКО endpoints которые ты ТОЧНО знаешь по документации. Не «логичные» пути, не «обычно бывает», а реально существующие.
+2. **СТОП-СПИСОК — у этих сервисов НЕТ публичного REST API для управления, ВСЕГДА вызывай report_no_rest_api:**
+   - Framer (api.framer.com) — есть только Plugin API внутри редактора
+   - Apple Notes / iCloud — нет публичного API
+   - Tinder, Instagram (для рядовых юзеров) — закрыты
+   - Любой сервис где документация упоминает только SDK/Plugin/iframe-embed без HTTP-эндпоинтов
+3. Если ты сомневаешься хотя бы немного в существовании API — вызови report_no_rest_api с честным «не уверен что у сервиса есть публичный REST». Лучше пустой пресет чем галлюцинации.
+4. ${opts.probeToken ? "У тебя есть токен и тулза probe_endpoint — ОБЯЗАТЕЛЬНО сделай 1-2 пробных GET-запроса (например GET / или GET /v1/me) чтобы убедиться что API живой и понять структуру. ТОЛЬКО ПОСЛЕ probe — генерируй endpoints на основе того что увидел." : "У тебя НЕТ возможности проверить API. Если baseURL не из списка хорошо известных (GitHub, OpenAI, Anthropic, Telegram, Stripe, Notion, Slack, Discord-OAuth, Linear, Twilio, SendGrid, Cloudflare, Spotify, Twitch) — вызывай report_no_rest_api."}
+5. Реально-проверенные API: GitHub (/user, /repos/{o}/{r}, ...), OpenAI (/v1/chat/completions, /v1/models), Anthropic (/v1/messages), Telegram Bot (/bot{token}/sendMessage), Stripe (/v1/customers, /v1/charges), Notion (/v1/pages, /v1/databases), Slack (/api/chat.postMessage), Spotify (/v1/me, /v1/playlists), Twitch Helix (/helix/users), и т.п.
 ${opts.probeToken ? `5. У ТЕБЯ ЕСТЬ ТУЛЗА probe_endpoint — реально дёргает API GET'ом с токеном юзера. ИСПОЛЬЗУЙ ЕЁ для разведки (1-3 раза): пробуй базовые пути типа /, /user, /v1, /me чтобы увидеть что API реально умеет. На основе ответа — точные endpoints.\n6. probe_endpoint только для GET. Не делай destructive операций.` : ""}
 
 Если API реальный, то:
