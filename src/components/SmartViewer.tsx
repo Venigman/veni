@@ -1060,9 +1060,9 @@ function AudioPlayer({ src }: { src: string }) {
         aria-label={playing ? "Пауза" : "Воспроизвести"}
       >
         {playing ? (
-          <Pause size={14} strokeWidth={2} />
+          <Pause size={14} strokeWidth={0} fill="currentColor" />
         ) : (
-          <Play size={14} strokeWidth={2} />
+          <Play size={14} strokeWidth={0} fill="currentColor" />
         )}
       </button>
       <input
