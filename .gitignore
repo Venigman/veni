@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.DS_Store
+*.tsbuildinfo
+.vite/
+.env
+.env.*
+
+# содержат токены — никогда не пушить
+data/

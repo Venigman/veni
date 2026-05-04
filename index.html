@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#0d1117" />
+    <meta name="description" content="VENI — универсальный пульт для любого HTTP API: пресеты, категории, действия в одно касание." />
+
+    <!-- PWA -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+
+    <!-- Browser-favicon — light версия (белый фон, чёрная V) — ярко в табе -->
+    <link rel="icon" type="image/png" sizes="16x16"   href="./favicon-16.png" />
+    <link rel="icon" type="image/png" sizes="32x32"   href="./favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./favicon-192.png" />
+
+    <!-- iOS standalone (как нативное приложение из Safari → На экран Домой):
+         dark-вариант, белая V на чёрном — выглядит нативно -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="VENI" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+
+    <title>VENI — Universal API Hub</title>
+    <script type="module" crossorigin src="./assets/index-C4dJoZ8t.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-z__IDisF.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      // Регистрируем service worker только в production-сборке.
+      // Используем относительный путь — scope привяжется к директории где лежит sw.js.
+      if ("serviceWorker" in navigator && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("./sw.js").catch(() => {});
+        });
+      }
+    </script>
+  </body>
+</html>
