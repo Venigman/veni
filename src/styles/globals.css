@@ -1772,3 +1772,47 @@ select.field-input {
   .brand { gap: 0; padding-right: 4px; }
   .runner > .method-select { min-width: 76px; }
 }
+
+/* ─── Toast — лёгкий floating-индикатор (clipboard / import) ─── */
+.veni-toast {
+  position: fixed;
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  animation: veni-toast-in 160ms ease-out;
+}
+.veni-toast > svg {
+  color: var(--status-low, #3fb950);
+  flex-shrink: 0;
+}
+/* desktop: верх по центру */
+@media (min-width: 769px) {
+  .veni-toast {
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+/* mobile: низ по центру (выше safe-area) */
+@media (max-width: 768px) {
+  .veni-toast {
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: calc(100vw - 32px);
+  }
+}
+@keyframes veni-toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}

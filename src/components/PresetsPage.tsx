@@ -225,23 +225,6 @@ export function PresetsPage() {
       <div className="page-header-row">
         <h1 className="page-title">Пресеты</h1>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {importFlash && (
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                padding: "0 10px",
-                height: 28,
-                borderRadius: "var(--radius-sm)",
-                background: "var(--bg-overlay)",
-                border: "1px solid var(--border-muted)",
-                fontSize: 12,
-                color: "var(--text-secondary)",
-              }}
-            >
-              {importFlash}
-            </span>
-          )}
           <input
             ref={importInputRef}
             type="file"
@@ -421,6 +404,17 @@ export function PresetsPage() {
         data={manualCopy}
         onClose={() => setManualCopy(null)}
       />
+      {importFlash && <Toast message={importFlash} />}
+    </div>
+  );
+}
+
+/* ─── Compact toast — фикс снизу (mobile) / сверху (desktop) ─── */
+function Toast({ message }: { message: string }) {
+  return (
+    <div className="veni-toast" role="status" aria-live="polite">
+      <Check size={14} strokeWidth={2.2} />
+      <span>{message}</span>
     </div>
   );
 }
