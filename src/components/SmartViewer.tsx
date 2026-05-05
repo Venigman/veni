@@ -817,21 +817,31 @@ function OsintToolBody({ result }: { result: Record<string, unknown> }) {
   if (Array.isArray(subdomains) && subdomains.length && typeof subdomains[0] === "string") {
     return <ChipList items={subdomains as string[]} kind="domain" />;
   }
-  // 3. domain/dns_a — records: { A: [...], AAAA: [...] }
+  // 3. email/holehe — массив services: ["github.com", "twitter.com", ...]
+  const services = result.services;
+  if (Array.isArray(services) && services.length && typeof services[0] === "string") {
+    return <ChipList items={services as string[]} kind="text" />;
+  }
+  // 4. domain/dnstwist — permutations: [{domain, fuzzer}]
+  const perms = result.permutations;
+  if (Array.isArray(perms) && perms.length && isObj(perms[0]) && typeof (perms[0] as Record<string, unknown>).domain === "string") {
+    return <DomainPermsList items={perms as Array<Record<string, unknown>>} />;
+  }
+  // 5. domain/dns_a — records: { A: [...], AAAA: [...] }
   const records = result.records;
   if (isObj(records)) {
     return <DnsRecords records={records as Record<string, unknown>} />;
   }
-  // 4. wayback — { first: {url, ts}, last: {url, ts} }
+  // 6. wayback — { first: {url, ts}, last: {url, ts} }
   if (isObj(result.first) || isObj(result.last)) {
     return <WaybackPair first={result.first} last={result.last} />;
   }
-  // 5. github_search — profile: {login, name, html_url, ...}
+  // 7. github_search — profile: {login, name, html_url, ...}
   const profile = result.profile;
   if (isObj(profile)) {
     return <GithubProfile profile={profile as Record<string, unknown>} />;
   }
-  // 6. geoip / phone / exif — плоский объект, фильтруем шумные поля
+  // 8. geoip / phone / exif / whois — плоский объект, фильтруем шумные поля
   const filtered: Array<[string, unknown]> = Object.entries(result).filter(
     ([k, v]) =>
       !["ok", "found", "error", "message", "checked_total"].includes(k) &&
@@ -894,6 +904,45 @@ function SitesList({ items }: { items: Array<Record<string, unknown>> }) {
             </span>
             {status !== null && (
               <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{status}</span>
+            )}
+          </a>
+        );
+      })}
+    </div>
+  );
+}
+
+function DomainPermsList({ items }: { items: Array<Record<string, unknown>> }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6 }}>
+      {items.map((p, i) => {
+        const dom = typeof p.domain === "string" ? p.domain : "?";
+        const fuzz = typeof p.fuzzer === "string" ? p.fuzzer : null;
+        return (
+          <a
+            key={i}
+            href={`https://${dom}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              padding: "6px 8px",
+              border: "1px solid var(--border-muted)",
+              borderRadius: "var(--radius-sm)",
+              background: "var(--bg-overlay)",
+              color: "var(--text-primary)",
+              textDecoration: "none",
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              gap: 2,
+            }}
+          >
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {dom}
+            </span>
+            {fuzz && (
+              <span style={{ fontSize: 9, color: "var(--text-muted)" }}>{fuzz}</span>
             )}
           </a>
         );
