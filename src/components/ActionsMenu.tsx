@@ -67,17 +67,18 @@ export function ActionsMenu({
       <button
         type="button"
         ref={triggerRef}
-        className="icon-btn dropdown-trigger"
+        className="icon-btn"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         aria-label={ariaLabel}
+        title={ariaLabel}
         onClick={(e) => {
           e.stopPropagation();
           setOpen((v) => !v);
         }}
       >
-        <MoreVertical size={14} strokeWidth={1.6} />
+        <MoreVertical size={16} strokeWidth={2} />
       </button>
       {open && pos && (
         <div
