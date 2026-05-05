@@ -878,7 +878,7 @@ function isObj(v: unknown): v is Record<string, unknown> {
 
 function statusBadge(status: number | null): { label: string; tone: "success" | "warn" | "error" | "neutral" } | null {
   if (status === null) return null;
-  if (status === 200) return { label: "OK", tone: "success" };
+  if (status === 200) return { label: "ok", tone: "success" };
   if (status >= 300 && status < 400) return { label: "redir", tone: "success" };
   if (status === 404) return { label: "нет", tone: "neutral" };
   if (status === 403) return { label: "блок", tone: "warn" };
