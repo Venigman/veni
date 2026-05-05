@@ -316,6 +316,9 @@ export function Workspace() {
             />
           </button>
           <div className="panel-body">
+            {method !== "GET" && method !== "DELETE" && (
+              <BodyEditor body={body} onChange={setBody} />
+            )}
             <KVSection
               label="Query parameters"
               rows={query}
@@ -518,6 +521,108 @@ export function Workspace() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function BodyEditor({ body, onChange }: { body: string; onChange: (s: string) => void }) {
+  const [open, setOpen] = useState(true);
+
+  const parse = useMemo(() => {
+    if (!body.trim()) return { ok: true as const, kind: "empty" as const };
+    try {
+      JSON.parse(body);
+      return { ok: true as const, kind: "json" as const };
+    } catch (e) {
+      return { ok: false as const, kind: "invalid" as const, error: (e as Error).message };
+    }
+  }, [body]);
+
+  const prettify = () => {
+    try {
+      const v = JSON.parse(body);
+      onChange(JSON.stringify(v, null, 2));
+    } catch {
+      /* leave as-is */
+    }
+  };
+
+  const sizeBytes = new TextEncoder().encode(body).length;
+
+  return (
+    <div className="section">
+      <div
+        className="section-label"
+        style={{ cursor: "pointer", userSelect: "none" }}
+        onClick={() => setOpen(!open)}
+      >
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <ChevronRight
+            size={12}
+            strokeWidth={2}
+            className="preset-category-chevron"
+            data-open={open}
+          />
+          Body
+          {body.trim() && (
+            <span
+              className="status-badge"
+              data-tone={parse.ok ? "success" : "error"}
+              style={{ height: 16, fontSize: 9, padding: "0 6px" }}
+            >
+              {parse.ok ? `JSON · ${formatSize(sizeBytes)}` : "invalid"}
+            </span>
+          )}
+        </span>
+        {parse.ok && parse.kind === "json" && (
+          <button
+            type="button"
+            className="btn btn--ghost"
+            style={{ height: 24, padding: "0 8px", fontSize: 11 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              prettify();
+            }}
+          >
+            Pretty
+          </button>
+        )}
+      </div>
+      {open && (
+        <>
+          <textarea
+            value={body}
+            onChange={(e) => onChange(e.target.value)}
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="none"
+            autoComplete="off"
+            inputMode="text"
+            placeholder='{"input":"vova_kanarov"}'
+            style={{
+              width: "100%",
+              minHeight: 80,
+              maxHeight: 280,
+              padding: 10,
+              border: "1px solid var(--border-muted)",
+              borderRadius: "var(--radius-sm)",
+              background: "var(--bg-overlay)",
+              color: "var(--text-primary)",
+              fontFamily: "var(--font-mono)",
+              fontSize: 12,
+              lineHeight: 1.5,
+              resize: "vertical",
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+          {!parse.ok && (
+            <div style={{ fontSize: 11, color: "var(--method-delete, #f87171)", marginTop: 4 }}>
+              {parse.error}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

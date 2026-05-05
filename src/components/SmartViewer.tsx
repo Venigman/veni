@@ -113,11 +113,37 @@ const HUMAN_FIELDS = [
 
 function findHumanText(value: unknown): string | null {
   if (typeof value !== "object" || value === null) return null;
+  // Osint-fan-out имеет своё поле `text` со сводкой "✓ tool → ..." —
+  // не показываем его как humanText, отдадим OsintFanoutView рендерить блоками.
+  if (isOsintFanout(value)) return null;
   for (const key of HUMAN_FIELDS) {
     const v = (value as Record<string, unknown>)[key];
     if (typeof v === "string" && v.trim().length > 0) return v;
   }
   return null;
+}
+
+function isOsintFanout(value: unknown): value is OsintFanout {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.command === "string" &&
+    typeof v.tools_total === "number" &&
+    typeof v.tools_ok === "number" &&
+    v.results !== null &&
+    typeof v.results === "object"
+  );
+}
+
+interface OsintFanout {
+  ok: boolean;
+  command: string;
+  input?: string;
+  tools_total: number;
+  tools_ok: number;
+  results: Record<string, Record<string, unknown>>;
+  took_ms?: number;
+  text?: string;
 }
 
 /**
@@ -690,6 +716,9 @@ function PrettyView({
   value: unknown;
   humanText: string | null;
 }) {
+  if (isOsintFanout(value)) {
+    return <OsintFanoutView data={value} />;
+  }
   if (humanText !== null) {
     return (
       <div className="pretty-text">
@@ -700,6 +729,292 @@ function PrettyView({
   return (
     <div className="pretty-root">
       <PrettyAny value={value} />
+    </div>
+  );
+}
+
+function OsintFanoutView({ data }: { data: OsintFanout }) {
+  const entries = Object.entries(data.results);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          fontFamily: "var(--font-mono)",
+          fontSize: 12,
+          color: "var(--text-secondary)",
+        }}
+      >
+        <span style={{ color: "var(--text-primary)", fontWeight: 600, textTransform: "uppercase" }}>
+          {data.command}
+        </span>
+        {data.input && <span>· {data.input}</span>}
+        <span style={{ flex: 1 }} />
+        <span>{data.tools_ok}/{data.tools_total} tools</span>
+        {typeof data.took_ms === "number" && <span>· {data.took_ms} ms</span>}
+      </div>
+      {entries.map(([toolName, result]) => (
+        <OsintToolBlock key={toolName} name={toolName} result={result} />
+      ))}
+    </div>
+  );
+}
+
+function OsintToolBlock({ name, result }: { name: string; result: Record<string, unknown> }) {
+  const ok = result.ok === true;
+  const found = typeof result.found === "string" ? result.found : null;
+  return (
+    <div
+      style={{
+        border: "1px solid var(--border-muted)",
+        borderRadius: "var(--radius-sm)",
+        background: "var(--bg-surface)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "8px 12px",
+          background: "var(--bg-overlay)",
+          borderBottom: "1px solid var(--border-muted)",
+          fontFamily: "var(--font-mono)",
+          fontSize: 12,
+        }}
+      >
+        <span
+          className="status-badge"
+          data-tone={ok ? "success" : "error"}
+          style={{ height: 18, fontSize: 10, padding: "0 6px" }}
+        >
+          {ok ? "OK" : "ERR"}
+        </span>
+        <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{name}</span>
+        {found && <span style={{ color: "var(--text-secondary)" }}>→ {found}</span>}
+        {!ok && typeof result.error === "string" && (
+          <span style={{ color: "var(--text-secondary)" }}>→ {result.error}</span>
+        )}
+      </div>
+      <div style={{ padding: "8px 12px" }}>
+        <OsintToolBody result={result} />
+      </div>
+    </div>
+  );
+}
+
+function OsintToolBody({ result }: { result: Record<string, unknown> }) {
+  // 1. username/sherlock — массив sites: [{site, url, status}]
+  const sites = result.sites;
+  if (Array.isArray(sites) && sites.length && isObj(sites[0]) && typeof (sites[0] as Record<string, unknown>).url === "string") {
+    return <SitesList items={sites as Array<Record<string, unknown>>} />;
+  }
+  // 2. domain/crtsh — массив subdomains: ["a.example.com", ...]
+  const subdomains = result.subdomains;
+  if (Array.isArray(subdomains) && subdomains.length && typeof subdomains[0] === "string") {
+    return <ChipList items={subdomains as string[]} kind="domain" />;
+  }
+  // 3. domain/dns_a — records: { A: [...], AAAA: [...] }
+  const records = result.records;
+  if (isObj(records)) {
+    return <DnsRecords records={records as Record<string, unknown>} />;
+  }
+  // 4. wayback — { first: {url, ts}, last: {url, ts} }
+  if (isObj(result.first) || isObj(result.last)) {
+    return <WaybackPair first={result.first} last={result.last} />;
+  }
+  // 5. github_search — profile: {login, name, html_url, ...}
+  const profile = result.profile;
+  if (isObj(profile)) {
+    return <GithubProfile profile={profile as Record<string, unknown>} />;
+  }
+  // 6. geoip / phone / exif — плоский объект, фильтруем шумные поля
+  const filtered: Array<[string, unknown]> = Object.entries(result).filter(
+    ([k, v]) =>
+      !["ok", "found", "error", "message", "checked_total"].includes(k) &&
+      v !== null &&
+      v !== undefined &&
+      v !== ""
+  );
+  if (filtered.length === 0) {
+    return <span className="pretty-muted">—</span>;
+  }
+  return (
+    <div className="pretty-object">
+      {filtered.map(([k, v]) => (
+        <div key={k} className="pretty-row">
+          <div className="pretty-key">{prettifyKey(k)}</div>
+          <div className="pretty-value">
+            <PrettyAny value={v} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function isObj(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+function SitesList({ items }: { items: Array<Record<string, unknown>> }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 6 }}>
+      {items.map((s, i) => {
+        const name = typeof s.site === "string" ? s.site : "?";
+        const url = typeof s.url === "string" ? s.url : null;
+        const status = typeof s.status === "number" ? s.status : null;
+        return (
+          <a
+            key={i}
+            href={url || "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 6,
+              padding: "6px 8px",
+              border: "1px solid var(--border-muted)",
+              borderRadius: "var(--radius-sm)",
+              background: "var(--bg-overlay)",
+              color: "var(--text-primary)",
+              textDecoration: "none",
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              cursor: url ? "pointer" : "default",
+            }}
+          >
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {name}
+            </span>
+            {status !== null && (
+              <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{status}</span>
+            )}
+          </a>
+        );
+      })}
+    </div>
+  );
+}
+
+function ChipList({ items, kind }: { items: string[]; kind: "domain" | "text" }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+      {items.map((s, i) => {
+        const href = kind === "domain" ? `https://${s}` : null;
+        const Tag = href ? "a" : "span";
+        return (
+          <Tag
+            key={i}
+            {...(href ? { href, target: "_blank", rel: "noopener noreferrer" } : {})}
+            style={{
+              padding: "3px 8px",
+              border: "1px solid var(--border-muted)",
+              borderRadius: 999,
+              background: "var(--bg-overlay)",
+              color: "var(--text-primary)",
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              textDecoration: "none",
+            }}
+          >
+            {s}
+          </Tag>
+        );
+      })}
+    </div>
+  );
+}
+
+function DnsRecords({ records }: { records: Record<string, unknown> }) {
+  const entries = Object.entries(records).filter(
+    ([, v]) => Array.isArray(v) && (v as unknown[]).length > 0
+  );
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {entries.map(([type, vals]) => (
+        <div key={type} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+          <span
+            style={{
+              minWidth: 50,
+              fontSize: 10,
+              fontWeight: 700,
+              color: "var(--text-secondary)",
+              fontFamily: "var(--font-mono)",
+              padding: "3px 6px",
+              background: "var(--bg-overlay)",
+              borderRadius: "var(--radius-sm)",
+              textAlign: "center",
+            }}
+          >
+            {type}
+          </span>
+          <div style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-primary)" }}>
+            {(vals as unknown[]).map((v, i) => (
+              <div key={i}>{String(v)}</div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function WaybackPair({ first, last }: { first: unknown; last: unknown }) {
+  const Snap = ({ label, snap }: { label: string; snap: unknown }) => {
+    if (!isObj(snap)) return null;
+    const url = typeof snap.url === "string" ? snap.url : null;
+    const ts = typeof snap.ts === "string" ? snap.ts : null;
+    return (
+      <div style={{ display: "flex", gap: 8, alignItems: "baseline", fontFamily: "var(--font-mono)", fontSize: 12 }}>
+        <span style={{ minWidth: 50, color: "var(--text-secondary)", fontWeight: 600 }}>{label}</span>
+        {ts && <span style={{ color: "var(--text-muted)" }}>{ts}</span>}
+        {url && (
+          <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-primary)", textDecoration: "underline" }}>
+            открыть
+          </a>
+        )}
+      </div>
+    );
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <Snap label="first" snap={first} />
+      <Snap label="last" snap={last} />
+    </div>
+  );
+}
+
+function GithubProfile({ profile }: { profile: Record<string, unknown> }) {
+  const get = (k: string) => (typeof profile[k] === "string" ? (profile[k] as string) : null);
+  const num = (k: string) => (typeof profile[k] === "number" ? (profile[k] as number) : null);
+  const url = get("html_url");
+  const login = get("login");
+  const name = get("name");
+  const bio = get("bio");
+  const followers = num("followers");
+  const repos = num("public_repos");
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, fontFamily: "var(--font-mono)", fontSize: 12 }}>
+      {url && (
+        <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+          @{login}
+        </a>
+      )}
+      {name && <span style={{ color: "var(--text-primary)" }}>{name}</span>}
+      {bio && <span style={{ color: "var(--text-secondary)" }}>{bio}</span>}
+      {(followers !== null || repos !== null) && (
+        <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
+          {followers !== null && `${followers} followers`}
+          {followers !== null && repos !== null && " · "}
+          {repos !== null && `${repos} repos`}
+        </span>
+      )}
     </div>
   );
 }
