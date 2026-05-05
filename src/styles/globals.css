@@ -918,9 +918,12 @@ select.kv-input {
 .status-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   height: 22px;
   padding: 0 8px;
+  box-sizing: border-box;
+  line-height: 1;
   border-radius: var(--radius-full);
   border: 1px solid var(--border);
   font-family: var(--font-mono);
