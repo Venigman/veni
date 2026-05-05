@@ -10,7 +10,6 @@ import {
   ChevronRight,
   Upload,
   Copy,
-  Loader2,
 } from "lucide-react";
 import { useAPIs } from "../context/APIs";
 import {
