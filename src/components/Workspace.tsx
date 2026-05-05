@@ -851,19 +851,15 @@ function computeProtectedRanges(src: string): Array<[number, number]> {
 }
 
 function renderJsonHighlight(src: string): React.ReactNode {
-  // Простой токенайзер: строки, числа, ключевые слова, разделители.
-  // Решает 95% случаев JSON-форматирования без зависимостей.
+  // Два цвета: muted (серый, не трогать) и primary (белый, редактируй).
   const muted = "var(--text-muted)";
   const accent = "var(--text-primary)";
-  const numColor = "var(--method-put, #d2992c)";
-  const strColor = "var(--status-low, #3fb950)";
 
   const tokens: React.ReactNode[] = [];
   let i = 0;
   let key = 0;
   while (i < src.length) {
     const ch = src[i];
-    // строка (key или value — отличаем по контексту: после неё сразу `:` = key)
     if (ch === '"') {
       let j = i + 1;
       while (j < src.length && src[j] !== '"') {
@@ -871,43 +867,31 @@ function renderJsonHighlight(src: string): React.ReactNode {
         else j += 1;
       }
       const literal = src.slice(i, j + 1);
-      // смотрим вперёд: если следующий не-пробельный = `:`, это ключ → muted
       let k = j + 1;
       while (k < src.length && /\s/.test(src[k])) k++;
       const isKey = src[k] === ":";
-      tokens.push(
-        <span key={key++} style={{ color: isKey ? muted : strColor }}>{literal}</span>
-      );
+      if (isKey) {
+        // ключ полностью серый
+        tokens.push(<span key={key++} style={{ color: muted }}>{literal}</span>);
+      } else {
+        // value-string: кавычки серым, контент — белым
+        tokens.push(<span key={key++} style={{ color: muted }}>"</span>);
+        if (literal.length > 2) {
+          tokens.push(<span key={key++} style={{ color: accent }}>{literal.slice(1, -1)}</span>);
+        }
+        if (literal.endsWith('"') && literal.length > 1) {
+          tokens.push(<span key={key++} style={{ color: muted }}>"</span>);
+        }
+      }
       i = j + 1;
       continue;
     }
-    // числа
-    if (/[\d-]/.test(ch) && /[\d.eE+-]/.test(src[i] || "")) {
-      let j = i;
-      while (j < src.length && /[\d.eE+-]/.test(src[j])) j++;
-      const num = src.slice(i, j);
-      if (/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(num)) {
-        tokens.push(<span key={key++} style={{ color: numColor }}>{num}</span>);
-        i = j;
-        continue;
-      }
-    }
-    // ключевые слова true/false/null
-    if (/[a-z]/.test(ch)) {
-      const m = src.slice(i).match(/^(true|false|null)/);
-      if (m) {
-        tokens.push(<span key={key++} style={{ color: numColor }}>{m[0]}</span>);
-        i += m[0].length;
-        continue;
-      }
-    }
-    // разделители {} [] : , — серым
     if ("{}[]:,".includes(ch)) {
       tokens.push(<span key={key++} style={{ color: muted }}>{ch}</span>);
       i++;
       continue;
     }
-    // пробелы и прочее — обычным
+    // числа, true/false/null, пробелы — белым
     tokens.push(<span key={key++} style={{ color: accent }}>{ch}</span>);
     i++;
   }
