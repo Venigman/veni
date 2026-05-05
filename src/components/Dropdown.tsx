@@ -132,13 +132,27 @@ export function Dropdown<T extends string = string>({
     const spaceAbove = rect.top;
     const placement: "below" | "above" =
       spaceBelow < 220 && spaceAbove > spaceBelow ? "above" : "below";
+
+    // Считаем left так, чтобы меню всегда помещалось в окне.
+    const vw = window.innerWidth;
+    const margin = 8;
+    // Ожидаемая ширина меню (для menuWidth=trigger — как у триггера, для auto — fallback ~180).
+    const expectedWidth = menuWidth === "trigger" ? rect.width : 180;
+    let left = mode === "menu"
+      ? rect.right - expectedWidth // выравниваем по правому краю триггера
+      : rect.left;
+    // Не вылезаем за правый край.
+    if (left + expectedWidth > vw - margin) left = vw - expectedWidth - margin;
+    // И за левый.
+    if (left < margin) left = margin;
+
     setMenuPos({
       top: placement === "below" ? rect.bottom + 4 : rect.top - 4,
-      left: rect.left,
+      left,
       width: menuWidth === "trigger" ? rect.width : undefined,
       placement,
     });
-  }, [open, menuWidth]);
+  }, [open, menuWidth, mode]);
 
   function commit(idx: number) {
     const opt = options[idx];
