@@ -704,7 +704,6 @@ function JsonHighlightTextarea({
     const ta = e.currentTarget;
     const start = ta.selectionStart ?? 0;
     const end = ta.selectionEnd ?? 0;
-    // @ts-expect-error inputType существует на InputEvent
     const inputType: string = (e.nativeEvent as InputEvent).inputType ?? "";
 
     // selection внутри protected → блокируем модификацию
