@@ -807,10 +807,16 @@ function OsintToolBlock({ name, result }: { name: string; result: Record<string,
 }
 
 function OsintToolBody({ result }: { result: Record<string, unknown> }) {
-  // 1. username/sherlock — массив sites: [{site, url, status}]
+  // 1. username/sherlock — массив sites: [{site, url, status}] + github_profile (опц.)
   const sites = result.sites;
   if (Array.isArray(sites) && sites.length && isObj(sites[0]) && typeof (sites[0] as Record<string, unknown>).url === "string") {
-    return <SitesList items={sites as Array<Record<string, unknown>>} />;
+    const ghp = isObj(result.github_profile) ? (result.github_profile as Record<string, unknown>) : null;
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <SitesList items={sites as Array<Record<string, unknown>>} />
+        {ghp && <GithubProfile profile={ghp} />}
+      </div>
+    );
   }
   // 2. domain/crtsh — массив subdomains: ["a.example.com", ...]
   const subdomains = result.subdomains;
