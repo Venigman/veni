@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Plus, Send, Trash2, Loader2, ChevronRight, ChevronDown } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Send, Trash2, Loader2, ChevronRight, ChevronDown, Paperclip, X as XIcon } from "lucide-react";
 import { useAPIs } from "../context/APIs";
 import { runRequest, type RunResult } from "../lib/request";
 import { SmartViewer } from "./SmartViewer";
@@ -34,6 +34,8 @@ export function Workspace() {
   const [headers, setHeaders] = useState<KV[]>([]);
   const [query, setQuery] = useState<KV[]>([]);
   const [body, setBody] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [acceptsFile, setAcceptsFile] = useState(false);
   // Для command-mode: когда тапаешь POST endpoint с body={"command":"/X"},
   // в path-input показываем "/X", а реальный POST-путь и body-шаблон сохраняем тут.
   const [commandEndpoint, setCommandEndpoint] = useState<{ path: string; bodyTemplate: string } | null>(null);
@@ -187,6 +189,7 @@ export function Workspace() {
       headers,
       query,
       body: useBody,
+      file: acceptsFile && file ? file : undefined,
     });
     setResult(res);
     setRunning(false);
@@ -316,6 +319,9 @@ export function Workspace() {
             />
           </button>
           <div className="panel-body">
+            {acceptsFile && (
+              <FileSection file={file} onChange={setFile} />
+            )}
             {method !== "GET" && method !== "DELETE" && (
               <BodyEditor body={body} onChange={setBody} />
             )}
@@ -390,6 +396,8 @@ export function Workspace() {
                   setMethod(ep.method as Method);
                   setPath(ep.path);
                   setBody(ep.body !== undefined ? ep.body : "");
+                  setAcceptsFile(!!ep.acceptsFile);
+                  setFile(null);
                   setCommandEndpoint(null);
                 }}
               />
@@ -521,6 +529,125 @@ export function Workspace() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function FileSection({ file, onChange }: { file: File | null; onChange: (f: File | null) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const previewURL = useMemo(() => {
+    if (!file || !file.type.startsWith("image/")) return null;
+    return URL.createObjectURL(file);
+  }, [file]);
+  useEffect(() => {
+    return () => {
+      if (previewURL) URL.revokeObjectURL(previewURL);
+    };
+  }, [previewURL]);
+
+  return (
+    <div className="section">
+      <div className="section-label" style={{ userSelect: "none" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <Paperclip size={12} strokeWidth={2} />
+          File
+          {file && (
+            <span
+              className="status-badge"
+              data-tone="success"
+              style={{ height: 16, fontSize: 9, padding: "0 6px" }}
+            >
+              {formatSize(file.size)}
+            </span>
+          )}
+        </span>
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          onChange(f);
+          e.target.value = "";
+        }}
+      />
+      {!file ? (
+        <button
+          type="button"
+          className="btn btn--ghost"
+          style={{ width: "100%", justifyContent: "center", padding: "12px 0" }}
+          onClick={() => inputRef.current?.click()}
+        >
+          <Paperclip size={14} strokeWidth={1.8} />
+          <span style={{ marginLeft: 6 }}>Выбрать фото</span>
+        </button>
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+            padding: 8,
+            border: "1px solid var(--border-muted)",
+            borderRadius: "var(--radius-sm)",
+            background: "var(--bg-overlay)",
+          }}
+        >
+          {previewURL ? (
+            <img
+              src={previewURL}
+              alt={file.name}
+              style={{
+                width: 56,
+                height: 56,
+                objectFit: "cover",
+                borderRadius: "var(--radius-sm)",
+                flexShrink: 0,
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "var(--bg-surface)",
+                borderRadius: "var(--radius-sm)",
+                flexShrink: 0,
+              }}
+            >
+              <Paperclip size={20} strokeWidth={1.6} />
+            </div>
+          )}
+          <div style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-mono)", fontSize: 12 }}>
+            <div
+              style={{
+                color: "var(--text-primary)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {file.name}
+            </div>
+            <div style={{ color: "var(--text-muted)", fontSize: 11 }}>
+              {file.type || "?"} · {formatSize(file.size)}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Убрать файл"
+            onClick={() => onChange(null)}
+          >
+            <XIcon size={14} strokeWidth={1.8} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -876,10 +1003,12 @@ function EndpointButton({
           fontWeight: 700,
           fontSize: 11,
           fontFamily: "var(--font-mono)",
-          color: `var(--method-${ep.method.toLowerCase()})`,
+          color: ep.acceptsFile
+            ? "var(--text-primary)"
+            : `var(--method-${ep.method.toLowerCase()})`,
         }}
       >
-        {ep.method}
+        {ep.acceptsFile ? "FILE" : ep.method}
       </span>
       {ep.status && (
         <span className="endpoint-badge" data-status={ep.status}>

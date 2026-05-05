@@ -7,6 +7,8 @@ export interface RunInput {
   headers: Array<{ key: string; value: string }>;
   query: Array<{ key: string; value: string }>;
   body?: string;
+  /** If set, ignore `body` and send multipart/form-data with `file` field. */
+  file?: File;
 }
 
 export interface RunResult {
@@ -65,7 +67,7 @@ function sanitizeURL(url: URL, api: APITab): string {
 }
 
 export async function runRequest(input: RunInput): Promise<RunResult> {
-  const { api, method, path, headers, query, body } = input;
+  const { api, method, path, headers, query, body, file } = input;
 
   const url = buildURL(api, path, query);
   const displayURL = sanitizeURL(url, api);
@@ -91,7 +93,24 @@ export async function runRequest(input: RunInput): Promise<RunResult> {
     referrerPolicy: "no-referrer",
   };
 
-  if (METHODS_WITH_BODY.has(method.toUpperCase()) && body && body.trim()) {
+  if (file) {
+    // multipart: browser сам выставит правильный Content-Type c boundary
+    const fd = new FormData();
+    fd.append("file", file, file.name);
+    // Если в body есть JSON — добавим его поля как form fields (для команд типа face match)
+    if (body && body.trim()) {
+      try {
+        const obj = JSON.parse(body) as Record<string, unknown>;
+        for (const [k, v] of Object.entries(obj)) {
+          if (v !== undefined && v !== null) fd.append(k, String(v));
+        }
+      } catch {
+        /* not JSON — ignore body when file is set */
+      }
+    }
+    init.body = fd;
+    reqHeaders.delete("content-type"); // позволим браузеру выставить multipart boundary
+  } else if (METHODS_WITH_BODY.has(method.toUpperCase()) && body && body.trim()) {
     init.body = body;
     if (!reqHeaders.has("content-type")) {
       try {

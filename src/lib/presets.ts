@@ -12,6 +12,11 @@ export interface PresetEndpoint {
   status?: EndpointStatus;
   /** Optional sub-category inside a preset — used to group endpoints in Workspace. */
   category?: string;
+  /**
+   * If true, this endpoint expects a file upload (multipart/form-data with field `file`).
+   * In the editor it shows up as method "FILE"; on the wire it's POST + multipart.
+   */
+  acceptsFile?: boolean;
 }
 
 export interface APIPreset {

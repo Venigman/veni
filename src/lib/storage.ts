@@ -9,6 +9,8 @@ export interface SavedEndpoint {
   body?: string;
   status?: EndpointStatus;
   category?: string;
+  /** Принимает файл (multipart/form-data, поле `file`). Под капотом всегда POST. */
+  acceptsFile?: boolean;
 }
 
 export interface APITab {

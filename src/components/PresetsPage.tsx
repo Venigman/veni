@@ -1207,20 +1207,31 @@ function EndpointRow({
         alignItems: "center",
       }}
     >
-      <Dropdown<PresetEndpoint["method"]>
+      <Dropdown<string>
         className="kv-input"
         ariaLabel="HTTP method"
-        value={ep.method}
-        onChange={(m) => onPatch({ method: m })}
+        value={ep.acceptsFile ? "FILE" : ep.method}
+        onChange={(m) => {
+          if (m === "FILE") {
+            onPatch({ method: "POST", acceptsFile: true });
+          } else {
+            onPatch({ method: m as PresetEndpoint["method"], acceptsFile: false });
+          }
+        }}
         triggerStyle={{
           fontWeight: 700,
-          color: `var(--method-${ep.method.toLowerCase()})`,
+          color: ep.acceptsFile
+            ? "var(--text-primary)"
+            : `var(--method-${ep.method.toLowerCase()})`,
         }}
-        options={METHODS.map((m) => ({
-          value: m,
-          label: m,
-          color: `var(--method-${m.toLowerCase()})`,
-        }))}
+        options={[
+          ...METHODS.map((m) => ({
+            value: m,
+            label: m,
+            color: `var(--method-${m.toLowerCase()})`,
+          })),
+          { value: "FILE", label: "FILE", color: "var(--text-primary)" },
+        ]}
       />
       <input
         className="kv-input"
