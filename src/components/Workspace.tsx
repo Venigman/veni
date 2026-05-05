@@ -662,6 +662,152 @@ function FileSection({ file, onChange }: { file: File | null; onChange: (f: File
   );
 }
 
+/**
+ * JSON-подсветка. Накладываем прозрачную textarea сверху на цветной <pre>.
+ * Текстовая каретка/выделение работают, но видим цветной syntax под ней.
+ *
+ * Серым = "не трогай" (ключи, скобки, кавычки, двоеточия, запятые).
+ * Обычным цветом = "то что меняешь" (значения).
+ */
+function JsonHighlightTextarea({
+  body, onChange, jsonOk,
+}: { body: string; onChange: (s: string) => void; jsonOk: boolean }) {
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const preRef = useRef<HTMLPreElement>(null);
+
+  // Синхронизация скролла textarea и pre
+  const syncScroll = () => {
+    if (taRef.current && preRef.current) {
+      preRef.current.scrollTop = taRef.current.scrollTop;
+      preRef.current.scrollLeft = taRef.current.scrollLeft;
+    }
+  };
+
+  const sharedStyle: React.CSSProperties = {
+    margin: 0,
+    padding: 10,
+    fontFamily: "var(--font-mono)",
+    fontSize: 12,
+    lineHeight: 1.5,
+    border: "1px solid var(--border-muted)",
+    borderRadius: "var(--radius-sm)",
+    boxSizing: "border-box",
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+    width: "100%",
+    minHeight: 80,
+    maxHeight: 280,
+    overflow: "auto",
+  };
+
+  return (
+    <div style={{ position: "relative", width: "100%" }}>
+      <pre
+        ref={preRef}
+        aria-hidden
+        style={{
+          ...sharedStyle,
+          position: "absolute",
+          inset: 0,
+          background: "var(--bg-overlay)",
+          color: "var(--text-primary)",
+          pointerEvents: "none",
+          overflow: "hidden",
+        }}
+      >
+        {jsonOk ? renderJsonHighlight(body) : body}
+        {/* Хвостовой пробел чтобы pre имела ту же высоту что textarea с переносом */}
+        {"​"}
+      </pre>
+      <textarea
+        ref={taRef}
+        value={body}
+        onChange={(e) => onChange(e.target.value)}
+        onScroll={syncScroll}
+        spellCheck={false}
+        autoCorrect="off"
+        autoCapitalize="none"
+        autoComplete="off"
+        inputMode="text"
+        placeholder='{"input":"vova_kanarov"}'
+        style={{
+          ...sharedStyle,
+          position: "relative",
+          background: "transparent",
+          color: "transparent",
+          caretColor: "var(--text-primary)",
+          resize: "vertical",
+          outline: "none",
+        }}
+      />
+    </div>
+  );
+}
+
+function renderJsonHighlight(src: string): React.ReactNode {
+  // Простой токенайзер: строки, числа, ключевые слова, разделители.
+  // Решает 95% случаев JSON-форматирования без зависимостей.
+  const muted = "var(--text-muted)";
+  const accent = "var(--text-primary)";
+  const numColor = "var(--method-put, #d2992c)";
+  const strColor = "var(--status-low, #3fb950)";
+
+  const tokens: React.ReactNode[] = [];
+  let i = 0;
+  let key = 0;
+  while (i < src.length) {
+    const ch = src[i];
+    // строка (key или value — отличаем по контексту: после неё сразу `:` = key)
+    if (ch === '"') {
+      let j = i + 1;
+      while (j < src.length && src[j] !== '"') {
+        if (src[j] === "\\") j += 2;
+        else j += 1;
+      }
+      const literal = src.slice(i, j + 1);
+      // смотрим вперёд: если следующий не-пробельный = `:`, это ключ → muted
+      let k = j + 1;
+      while (k < src.length && /\s/.test(src[k])) k++;
+      const isKey = src[k] === ":";
+      tokens.push(
+        <span key={key++} style={{ color: isKey ? muted : strColor }}>{literal}</span>
+      );
+      i = j + 1;
+      continue;
+    }
+    // числа
+    if (/[\d-]/.test(ch) && /[\d.eE+-]/.test(src[i] || "")) {
+      let j = i;
+      while (j < src.length && /[\d.eE+-]/.test(src[j])) j++;
+      const num = src.slice(i, j);
+      if (/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(num)) {
+        tokens.push(<span key={key++} style={{ color: numColor }}>{num}</span>);
+        i = j;
+        continue;
+      }
+    }
+    // ключевые слова true/false/null
+    if (/[a-z]/.test(ch)) {
+      const m = src.slice(i).match(/^(true|false|null)/);
+      if (m) {
+        tokens.push(<span key={key++} style={{ color: numColor }}>{m[0]}</span>);
+        i += m[0].length;
+        continue;
+      }
+    }
+    // разделители {} [] : , — серым
+    if ("{}[]:,".includes(ch)) {
+      tokens.push(<span key={key++} style={{ color: muted }}>{ch}</span>);
+      i++;
+      continue;
+    }
+    // пробелы и прочее — обычным
+    tokens.push(<span key={key++} style={{ color: accent }}>{ch}</span>);
+    i++;
+  }
+  return tokens;
+}
+
 function BodyEditor({ body, onChange }: { body: string; onChange: (s: string) => void }) {
   const [open, setOpen] = useState(true);
 
@@ -727,31 +873,10 @@ function BodyEditor({ body, onChange }: { body: string; onChange: (s: string) =>
       </div>
       {open && (
         <>
-          <textarea
-            value={body}
-            onChange={(e) => onChange(e.target.value)}
-            spellCheck={false}
-            autoCorrect="off"
-            autoCapitalize="none"
-            autoComplete="off"
-            inputMode="text"
-            placeholder='{"input":"vova_kanarov"}'
-            style={{
-              width: "100%",
-              minHeight: 80,
-              maxHeight: 280,
-              padding: 10,
-              border: "1px solid var(--border-muted)",
-              borderRadius: "var(--radius-sm)",
-              background: "var(--bg-overlay)",
-              color: "var(--text-primary)",
-              fontFamily: "var(--font-mono)",
-              fontSize: 12,
-              lineHeight: 1.5,
-              resize: "vertical",
-              outline: "none",
-              boxSizing: "border-box",
-            }}
+          <JsonHighlightTextarea
+            body={body}
+            onChange={onChange}
+            jsonOk={parse.ok && parse.kind === "json"}
           />
           {!parse.ok && (
             <div style={{ fontSize: 11, color: "var(--method-delete, #f87171)", marginTop: 4 }}>
