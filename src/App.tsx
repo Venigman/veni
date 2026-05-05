@@ -1,22 +1,20 @@
 import { useState } from "react";
-import { Eye, Pencil, FolderClosed, LayoutGrid } from "lucide-react";
+import { Eye, Pencil, LayoutGrid } from "lucide-react";
 import { APIsProvider, useAPIs } from "./context/APIs";
 import { TabBar } from "./components/TabBar";
 import { AddAPIModal } from "./components/AddAPIModal";
 import { Workspace } from "./components/Workspace";
-import { KeysPage } from "./components/KeysPage";
 import { PresetsPage } from "./components/PresetsPage";
 
 function Shell() {
   const { apis, view, setView } = useAPIs();
   const [addOpen, setAddOpen] = useState(apis.length === 0);
 
-  const onKeys = view === "keys";
   const onPresets = view === "presets";
   const onWorkspace = view === "workspace";
 
   // Toggle the page view: clicking the active page button returns to workspace.
-  function toggle(target: "keys" | "presets") {
+  function toggle(target: "presets") {
     setView(view === target ? "workspace" : target);
   }
 
@@ -42,21 +40,9 @@ function Shell() {
             <LayoutGrid size={14} strokeWidth={1.8} />
             <span>Пресеты</span>
           </button>
-          <button
-            type="button"
-            className="btn btn--secondary"
-            data-active={onKeys}
-            onClick={() => toggle("keys")}
-            aria-label="Полученные ключи"
-            title="Полученные ключи"
-          >
-            <FolderClosed size={14} strokeWidth={1.8} />
-            <span>Ключи</span>
-          </button>
         </div>
       </div>
       {onWorkspace && <TabBar onAddClick={() => setAddOpen(true)} />}
-      {onKeys && <KeysPage />}
       {onPresets && <PresetsPage />}
       {onWorkspace && <Workspace />}
       <AddAPIModal open={addOpen} onClose={() => setAddOpen(false)} />
