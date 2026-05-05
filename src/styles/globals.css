@@ -1773,52 +1773,38 @@ select.field-input {
   .runner > .method-select { min-width: 76px; }
 }
 
-/* ─── Toast — лёгкий floating-индикатор (clipboard / import) ─── */
+/* ─── Toast — компактный floating-индикатор (clipboard / import).
+   Одинаковое поведение на desktop и mobile: верх по центру, solid bg. ─── */
 .veni-toast {
   position: fixed;
   z-index: 1000;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  background: var(--bg-elevated);
+  /* Solid непрозрачный фон чтобы контент не просвечивал. */
+  background: #1a1f29;
   border: 1px solid var(--border-muted);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 12px;
   font-weight: 500;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
   pointer-events: none;
+  max-width: calc(100vw - 32px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   animation: veni-toast-in 160ms ease-out;
 }
 .veni-toast > svg {
   color: var(--status-low, #3fb950);
   flex-shrink: 0;
 }
-/* desktop: вверху по центру, компактный */
-@media (min-width: 769px) {
-  .veni-toast {
-    top: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    animation: veni-toast-in-desktop 160ms ease-out;
-  }
-}
-/* mobile: вверху на всю ширину с padding 16 по бокам */
-@media (max-width: 768px) {
-  .veni-toast {
-    top: calc(16px + env(safe-area-inset-top));
-    left: 16px;
-    right: 16px;
-    justify-content: center;
-    animation: veni-toast-in-mobile 160ms ease-out;
-  }
-}
-@keyframes veni-toast-in-desktop {
+@keyframes veni-toast-in {
   from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-@keyframes veni-toast-in-mobile {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
 }
