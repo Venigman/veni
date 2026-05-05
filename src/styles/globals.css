@@ -326,6 +326,10 @@ a:hover { text-decoration: underline; }
   background: var(--bg-muted);
   color: var(--text-primary);
 }
+.tab-close[data-confirming="true"] {
+  background: rgba(248, 81, 73, 0.15);
+  color: var(--status-high);
+}
 
 .tab-add {
   display: inline-flex;
@@ -1653,11 +1657,7 @@ select.field-input {
     padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
 
-  /* Tab close: bigger hit area without growing the tab vertically. */
-  .tab-close[data-confirming="true"] {
-    background: rgba(248, 81, 73, 0.15);
-    color: var(--status-high);
-  }
+  /* Tab close: confirming-стиль теперь общий, см. выше. */
 
   /* Runner — same heights as desktop; keep flex-wrap so the path drops to
      its own row when needed. */
