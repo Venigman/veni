@@ -1527,6 +1527,11 @@ select.field-input {
   border-radius: var(--radius-sm);
   vertical-align: middle;
 }
+.preset-source-tag[data-warn="true"] {
+  color: var(--status-med);
+  border-color: color-mix(in srgb, var(--status-med) 40%, transparent);
+  background: color-mix(in srgb, var(--status-med) 10%, transparent);
+}
 .preset-card-main { flex: 1; min-width: 0; }
 .preset-card-name {
   font-size: var(--text-base);

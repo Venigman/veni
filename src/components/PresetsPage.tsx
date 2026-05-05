@@ -480,15 +480,15 @@ function PresetCard({
         <div className="preset-card-name">
           {preset.name || "Без имени"}
           {sourceTag && <span className="preset-source-tag">{sourceTag}</span>}
+          {tokenWarn && (
+            <span className="preset-source-tag" data-warn="true">
+              нет токена
+            </span>
+          )}
         </div>
         <div className="preset-card-meta">
           {preset.baseURL.replace(/^https?:\/\//, "")} · {preset.endpoints.length}{" "}
           {endpointsWord(preset.endpoints.length)}
-          {tokenWarn && (
-            <span style={{ marginLeft: 8, color: "var(--status-med)" }}>
-              · нет токена
-            </span>
-          )}
         </div>
       </div>
       <button
