@@ -683,6 +683,70 @@ function JsonHighlightTextarea({
     }
   };
 
+  // Защищённые диапазоны (ключи, скобки, кавычки, разделители) — пересчитываем
+  // только когда body валидный JSON. На invalid JSON блокировка отключается
+  // чтобы юзер мог исправить.
+  const protectedRanges = useMemo(
+    () => (jsonOk ? computeProtectedRanges(body) : []),
+    [body, jsonOk]
+  );
+
+  const isProtected = (idx: number) => {
+    for (const [a, b] of protectedRanges) {
+      if (idx >= a && idx < b) return true;
+    }
+    return false;
+  };
+
+  // Блокировка ввода в защищённые куски
+  const handleBeforeInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
+    if (!jsonOk) return;
+    const ta = e.currentTarget;
+    const start = ta.selectionStart ?? 0;
+    const end = ta.selectionEnd ?? 0;
+    // @ts-expect-error inputType существует на InputEvent
+    const inputType: string = (e.nativeEvent as InputEvent).inputType ?? "";
+
+    // selection внутри protected → блокируем модификацию
+    let collidesProtected = false;
+    if (start === end) {
+      // курсор: проверяем символ по обе стороны для delete/backspace
+      if (inputType === "deleteContentBackward" && start > 0 && isProtected(start - 1)) collidesProtected = true;
+      else if (inputType === "deleteContentForward" && isProtected(start)) collidesProtected = true;
+      else if (inputType.startsWith("insert")) {
+        // вставка прямо внутрь protected (start === end внутри ключа/скобки)
+        if (start > 0 && isProtected(start - 1) && isProtected(start)) collidesProtected = true;
+      }
+    } else {
+      // selection: если хоть один char внутри protected → блок
+      for (let i = start; i < end; i++) {
+        if (isProtected(i)) { collidesProtected = true; break; }
+      }
+    }
+    if (collidesProtected) {
+      e.preventDefault();
+    }
+  };
+
+  // Snap-курсор: если юзер кликает в protected range, переводим caret
+  // на ближайший редактируемый символ.
+  const handleSelect = () => {
+    if (!jsonOk) return;
+    const ta = taRef.current;
+    if (!ta) return;
+    const s = ta.selectionStart;
+    const e = ta.selectionEnd;
+    if (s !== e) return;
+    if (!isProtected(s)) return;
+    // ищем ближайшую editable-позицию
+    let next = s;
+    while (next < body.length && isProtected(next)) next++;
+    let prev = s - 1;
+    while (prev >= 0 && isProtected(prev)) prev--;
+    const target = (s - prev <= next - s) ? prev + 1 : next;
+    if (target !== s) ta.setSelectionRange(target, target);
+  };
+
   const sharedStyle: React.CSSProperties = {
     margin: 0,
     padding: 10,
@@ -724,6 +788,9 @@ function JsonHighlightTextarea({
         value={body}
         onChange={(e) => onChange(e.target.value)}
         onScroll={syncScroll}
+        onBeforeInput={handleBeforeInput}
+        onSelect={handleSelect}
+        onClick={handleSelect}
         spellCheck={false}
         autoCorrect="off"
         autoCapitalize="none"
@@ -742,6 +809,46 @@ function JsonHighlightTextarea({
       />
     </div>
   );
+}
+
+/**
+ * Возвращает массив диапазонов [start, end) символов которые нельзя
+ * редактировать: ключи в кавычках (включая кавычки), разделители {}[]:,
+ * Открытие/закрытие строки-значения тоже защищено (кавычки), но содержимое — нет.
+ */
+function computeProtectedRanges(src: string): Array<[number, number]> {
+  const ranges: Array<[number, number]> = [];
+  let i = 0;
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === '"') {
+      let j = i + 1;
+      while (j < src.length && src[j] !== '"') {
+        if (src[j] === "\\") j += 2;
+        else j += 1;
+      }
+      // Смотрим вперёд: следующий не-пробельный
+      let k = j + 1;
+      while (k < src.length && /\s/.test(src[k])) k++;
+      if (src[k] === ":") {
+        // ключ: вся строка (включая кавычки) protected
+        ranges.push([i, j + 1]);
+      } else {
+        // value-string: только кавычки protected, внутреннее редактируется
+        ranges.push([i, i + 1]);          // открывающая
+        if (j < src.length) ranges.push([j, j + 1]); // закрывающая
+      }
+      i = j + 1;
+      continue;
+    }
+    if ("{}[]:,".includes(ch)) {
+      ranges.push([i, i + 1]);
+      i++;
+      continue;
+    }
+    i++;
+  }
+  return ranges;
 }
 
 function renderJsonHighlight(src: string): React.ReactNode {
