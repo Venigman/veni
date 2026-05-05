@@ -1,7 +1,9 @@
-import { useEffect, useId, useRef, useState } from "react";
 import { MoreVertical } from "lucide-react";
+import { Dropdown } from "./Dropdown";
 
 export interface ActionsMenuItem {
+  /** Уникальный идентификатор пункта (можно label или action). */
+  key: string;
   label: string;
   onClick: () => void;
   danger?: boolean;
@@ -9,9 +11,10 @@ export interface ActionsMenuItem {
 }
 
 /**
- * Кебаб-меню (троеточие) → поповер с действиями. Использует те же CSS-классы
- * что и Dropdown — `.dropdown-menu` / `.dropdown-option`. Без логики выбора:
- * каждый item это action с onClick.
+ * Кебаб-меню (троеточие) → поповер с действиями. Это просто `Dropdown` в режиме
+ * `menu`: использует те же CSS-классы (.dropdown-trigger / .dropdown-menu /
+ * .dropdown-option), hover/focus/keyboard/outside-click работают одинаково
+ * с обычным селектом.
  */
 export function ActionsMenu({
   items,
@@ -20,108 +23,25 @@ export function ActionsMenu({
   items: ActionsMenuItem[];
   ariaLabel?: string;
 }) {
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
-  const menuId = useId();
-
-  useEffect(() => {
-    if (!open) {
-      setPos(null);
-      return;
-    }
-    const r = triggerRef.current?.getBoundingClientRect();
-    if (!r) return;
-    setPos({
-      top: r.bottom + 4,
-      left: Math.max(8, r.right - 200),
-      width: 200,
-    });
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onClick = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (
-        !triggerRef.current?.contains(t) &&
-        !menuRef.current?.contains(t)
-      ) {
-        setOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
   return (
-    <>
-      <button
-        type="button"
-        ref={triggerRef}
-        className="icon-btn"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        aria-label={ariaLabel}
-        title={ariaLabel}
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((v) => !v);
-        }}
-      >
-        <MoreVertical size={16} strokeWidth={2} />
-      </button>
-      {open && pos && (
-        <div
-          id={menuId}
-          ref={menuRef}
-          role="menu"
-          className="dropdown-menu"
-          style={{
-            position: "fixed",
-            top: pos.top,
-            left: pos.left,
-            width: pos.width,
-            minWidth: pos.width,
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {items.map((it, i) => (
-            <div
-              key={i}
-              role="menuitem"
-              tabIndex={-1}
-              className="dropdown-option"
-              data-danger={it.danger ? true : undefined}
-              onClick={() => {
-                setOpen(false);
-                it.onClick();
-              }}
-              style={
-                it.danger
-                  ? { color: "var(--status-high, #f85149)" }
-                  : undefined
-              }
-            >
-              {it.icon ? (
-                <span style={{ display: "inline-flex", marginRight: 8 }}>
-                  {it.icon}
-                </span>
-              ) : null}
-              {it.label}
-            </div>
-          ))}
-        </div>
-      )}
-    </>
+    <Dropdown
+      mode="menu"
+      menuWidth="auto"
+      ariaLabel={ariaLabel}
+      className="icon-btn"
+      value=""
+      options={items.map((it) => ({
+        value: it.key,
+        label: it.label,
+        danger: it.danger,
+        icon: it.icon,
+      }))}
+      onChange={(key) => {
+        const it = items.find((i) => i.key === key);
+        it?.onClick();
+      }}
+      triggerProps={{ title: ariaLabel }}
+      triggerContent={<MoreVertical size={16} strokeWidth={2} />}
+    />
   );
 }

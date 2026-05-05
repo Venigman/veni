@@ -266,16 +266,19 @@ export function PresetsPage() {
                     <ActionsMenu
                       items={[
                         {
+                          key: "copy",
                           label: "Скопировать",
                           icon: <Copy size={13} strokeWidth={1.6} />,
                           onClick: () => exportOne(p),
                         },
                         {
+                          key: "edit",
                           label: "Редактировать",
                           icon: <Pencil size={13} strokeWidth={1.6} />,
                           onClick: () => setEditing(p),
                         },
                         {
+                          key: "delete",
                           label: confirming ? "Точно удалить?" : "Удалить",
                           icon: <Trash2 size={13} strokeWidth={1.6} />,
                           danger: true,
@@ -308,16 +311,19 @@ export function PresetsPage() {
                     <ActionsMenu
                       items={[
                         {
+                          key: "copy",
                           label: "Скопировать",
                           icon: <Copy size={13} strokeWidth={1.6} />,
                           onClick: () => exportOne(p),
                         },
                         {
+                          key: "edit",
                           label: "Редактировать",
                           icon: <Pencil size={13} strokeWidth={1.6} />,
                           onClick: () => setEditing(p),
                         },
                         {
+                          key: "delete",
                           label: confirming ? "Точно удалить?" : "Удалить",
                           icon: <Trash2 size={13} strokeWidth={1.6} />,
                           danger: true,

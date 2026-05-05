@@ -5,6 +5,10 @@ export interface DropdownOption<T extends string = string> {
   label: string;
   /** Optional inline color for option label (e.g. method colors). */
   color?: string;
+  /** Декоративная иконка слева от лейбла. */
+  icon?: React.ReactNode;
+  /** Маркирует пункт как деструктивный (красный). */
+  danger?: boolean;
 }
 
 interface Props<T extends string = string> {
@@ -21,6 +25,16 @@ interface Props<T extends string = string> {
   triggerStyle?: React.CSSProperties;
   /** Width strategy for the open menu. "trigger" = same width as button (default). "auto" = content width. */
   menuWidth?: "trigger" | "auto";
+  /**
+   * Кастомное содержимое триггер-кнопки (например иконка ⋮ для actions-меню).
+   * Если не задано — показываем `current.label` как обычный select.
+   */
+  triggerContent?: React.ReactNode;
+  /**
+   * "menu" → каждый option это действие, value не обновляется визуально, onChange
+   * вызывается и меню закрывается. "select" (default) — обычный селект.
+   */
+  mode?: "select" | "menu";
 }
 
 /**
@@ -38,6 +52,8 @@ export function Dropdown<T extends string = string>({
   triggerProps,
   triggerStyle,
   menuWidth = "trigger",
+  triggerContent,
+  mode = "select",
 }: Props<T>) {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState<number>(() =>
@@ -165,17 +181,22 @@ export function Dropdown<T extends string = string>({
       <button
         type="button"
         ref={triggerRef}
-        className={`${className} dropdown-trigger`}
-        aria-haspopup="listbox"
+        className={`${className}${triggerContent ? "" : " dropdown-trigger"}`}
+        aria-haspopup={mode === "menu" ? "menu" : "listbox"}
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         aria-label={ariaLabel}
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => {
+          if (mode === "menu") e.stopPropagation();
+          setOpen((v) => !v);
+        }}
         onKeyDown={onTriggerKey}
         style={triggerStyle}
         {...triggerProps}
       >
-        <span className="dropdown-value">{current?.label ?? ""}</span>
+        {triggerContent ?? (
+          <span className="dropdown-value">{current?.label ?? ""}</span>
+        )}
       </button>
 
       {open && menuPos && (
@@ -202,11 +223,18 @@ export function Dropdown<T extends string = string>({
           {options.map((opt, idx) => (
             <div
               key={opt.value}
-              role="option"
-              aria-selected={opt.value === value}
+              role={mode === "menu" ? "menuitem" : "option"}
+              aria-selected={mode === "select" ? opt.value === value : undefined}
               data-highlighted={idx === highlight}
+              data-danger={opt.danger ? true : undefined}
               className="dropdown-option"
-              style={opt.color ? { color: opt.color, fontWeight: 700 } : undefined}
+              style={
+                opt.danger
+                  ? { color: "var(--status-high, #f85149)" }
+                  : opt.color
+                    ? { color: opt.color, fontWeight: 700 }
+                    : undefined
+              }
               onMouseEnter={() => setHighlight(idx)}
               onMouseDown={(e) => {
                 // mousedown so click registers before outside-click handler
@@ -214,6 +242,11 @@ export function Dropdown<T extends string = string>({
                 commit(idx);
               }}
             >
+              {opt.icon ? (
+                <span style={{ display: "inline-flex", marginRight: 8, opacity: 0.85 }}>
+                  {opt.icon}
+                </span>
+              ) : null}
               {opt.label}
             </div>
           ))}
