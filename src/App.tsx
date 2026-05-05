@@ -1,22 +1,23 @@
-import { useState } from "react";
 import { Eye, Pencil, LayoutGrid } from "lucide-react";
 import { APIsProvider, useAPIs } from "./context/APIs";
 import { TabBar } from "./components/TabBar";
-import { AddAPIModal } from "./components/AddAPIModal";
 import { Workspace } from "./components/Workspace";
 import { PresetsPage } from "./components/PresetsPage";
 
 function Shell() {
-  const { apis, view, setView } = useAPIs();
-  const [addOpen, setAddOpen] = useState(apis.length === 0);
+  const { view, setView } = useAPIs();
 
   const onPresets = view === "presets";
   const onWorkspace = view === "workspace";
 
-  // Toggle the page view: clicking the active page button returns to workspace.
   function toggle(target: "presets") {
     setView(view === target ? "workspace" : target);
   }
+
+  // "+" в табах главной страницы — переводим юзера на страницу Пресеты.
+  // Создание идёт ТОЛЬКО через пресеты (добавление API напрямую убрано —
+  // см. AddAPIModal удалён из flow).
+  const handleAddTab = () => setView("presets");
 
   return (
     <div className="app-root">
@@ -42,10 +43,9 @@ function Shell() {
           </button>
         </div>
       </div>
-      {onWorkspace && <TabBar onAddClick={() => setAddOpen(true)} />}
+      {onWorkspace && <TabBar onAddClick={handleAddTab} />}
       {onPresets && <PresetsPage />}
       {onWorkspace && <Workspace />}
-      <AddAPIModal open={addOpen} onClose={() => setAddOpen(false)} />
     </div>
   );
 }
