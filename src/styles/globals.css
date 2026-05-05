@@ -1795,24 +1795,30 @@ select.field-input {
   color: var(--status-low, #3fb950);
   flex-shrink: 0;
 }
-/* desktop: верх по центру */
+/* desktop: вверху по центру, компактный */
 @media (min-width: 769px) {
   .veni-toast {
     top: 16px;
     left: 50%;
     transform: translateX(-50%);
+    animation: veni-toast-in-desktop 160ms ease-out;
   }
 }
-/* mobile: низ по центру (выше safe-area) */
+/* mobile: вверху на всю ширину с padding 16 по бокам */
 @media (max-width: 768px) {
   .veni-toast {
-    bottom: calc(16px + env(safe-area-inset-bottom));
-    left: 50%;
-    transform: translateX(-50%);
-    max-width: calc(100vw - 32px);
+    top: calc(16px + env(safe-area-inset-top));
+    left: 16px;
+    right: 16px;
+    justify-content: center;
+    animation: veni-toast-in-mobile 160ms ease-out;
   }
 }
-@keyframes veni-toast-in {
+@keyframes veni-toast-in-desktop {
   from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes veni-toast-in-mobile {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
