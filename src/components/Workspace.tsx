@@ -679,7 +679,6 @@ function JsonHighlightTextarea({
     margin: 0,
     padding: 10,
     fontFamily: "var(--font-mono)",
-    fontSize: 16, // 16+ чтобы iOS не делал zoom при фокусе
     lineHeight: 1.5,
     border: "1px solid var(--border-muted)",
     borderRadius: "var(--radius-sm)",
@@ -692,10 +691,11 @@ function JsonHighlightTextarea({
   };
 
   return (
-    <div style={{ position: "relative", width: "100%" }}>
+    <div style={{ position: "relative", width: "100%" }} className="json-body-wrap">
       <pre
         ref={preRef}
         aria-hidden
+        className="json-body-pre"
         style={{
           ...sharedStyle,
           position: "absolute",
@@ -711,6 +711,7 @@ function JsonHighlightTextarea({
       </pre>
       <textarea
         ref={taRef}
+        className="json-body-textarea"
         value={body}
         onChange={(e) => onChange(e.target.value)}
         onScroll={syncScroll}
@@ -719,7 +720,7 @@ function JsonHighlightTextarea({
         autoCapitalize="none"
         autoComplete="off"
         inputMode="text"
-        placeholder='{"input":"vova_kanarov"}'
+        placeholder='{"input":"vasya_kartoplya"}'
         style={{
           ...sharedStyle,
           position: "relative",

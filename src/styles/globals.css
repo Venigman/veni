@@ -331,6 +331,12 @@ a:hover { text-decoration: underline; }
   color: var(--status-high);
 }
 
+/* Body editor JSON-подсветка: 12px на десктопе, 16px на мобиле (anti-zoom) */
+.json-body-pre, .json-body-textarea { font-size: 12px; }
+@media (max-width: 768px) {
+  .json-body-pre, .json-body-textarea { font-size: 16px; }
+}
+
 .tab-add {
   display: inline-flex;
   align-items: center;
