@@ -933,6 +933,11 @@ select.kv-input {
   background: var(--bg-overlay);
   color: var(--text-secondary);
 }
+.status-badge[data-tone="neutral"] {
+  color: var(--text-muted);
+  border-color: var(--border-muted);
+  background: var(--bg-overlay);
+}
 .status-badge[data-tone="success"] {
   color: var(--status-low);
   border-color: rgba(63,185,80,0.4);
