@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Eye, Pencil, FolderClosed, LayoutGrid } from "lucide-react";
+import { Eye, Pencil, FolderClosed, LayoutGrid } from "lucide-react";
 import { APIsProvider, useAPIs } from "./context/APIs";
 import { TabBar } from "./components/TabBar";
 import { AddAPIModal } from "./components/AddAPIModal";
@@ -52,15 +52,6 @@ function Shell() {
           >
             <FolderClosed size={14} strokeWidth={1.8} />
             <span>Ключи</span>
-          </button>
-          <button
-            type="button"
-            className="btn btn--secondary"
-            onClick={() => setAddOpen(true)}
-            aria-label="Add API"
-          >
-            <Plus size={14} strokeWidth={2} />
-            <span>Add API</span>
           </button>
         </div>
       </div>
