@@ -54,6 +54,7 @@ export function PresetsPage() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [importFlash, setImportFlash] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [manualCopy, setManualCopy] = useState<{ text: string; label: string } | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   function stripSecrets<T>(obj: T): T {
@@ -73,27 +74,49 @@ export function PresetsPage() {
     return obj;
   }
 
-  async function copyToClipboard(data: unknown, label: string) {
+  function copyToClipboard(data: unknown, label: string) {
     const text = JSON.stringify(stripSecrets(data), null, 2);
-    try {
-      await navigator.clipboard.writeText(text);
-      flashImport(`Скопировано: ${label}`);
-    } catch {
-      // Фолбэк через document.execCommand для старых iOS Safari
+    // Синхронный fallback через execCommand — для случаев когда iOS PWA
+    // отдаёт `clipboard.writeText` в reject (потеря user-gesture после
+    // dropdown-анимации). Сначала пробуем синхронный path, потом async API.
+    const tryExecCommand = (): boolean => {
       const ta = document.createElement("textarea");
       ta.value = text;
+      ta.setAttribute("readonly", "");
       ta.style.position = "fixed";
+      ta.style.top = "0";
+      ta.style.left = "0";
       ta.style.opacity = "0";
       document.body.appendChild(ta);
       ta.select();
+      ta.setSelectionRange(0, text.length);
+      let ok = false;
       try {
-        document.execCommand("copy");
-        flashImport(`Скопировано: ${label}`);
+        ok = document.execCommand("copy");
       } catch {
-        flashImport("Не удалось скопировать — браузер не разрешает");
+        ok = false;
       }
       document.body.removeChild(ta);
+      return ok;
+    };
+
+    if (tryExecCommand()) {
+      flashImport(`Скопировано: ${label}`);
+      return;
     }
+
+    // Async clipboard API как второй шанс (часть iOS Safari в PWA её одобрит).
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard
+        .writeText(text)
+        .then(() => flashImport(`Скопировано: ${label}`))
+        .catch(() => {
+          // Полный fail — открываем диалог где юзер сам скопирует руками.
+          setManualCopy({ text, label });
+        });
+      return;
+    }
+    setManualCopy({ text, label });
   }
 
   function exportOne(p: APIPreset) {
@@ -112,9 +135,19 @@ export function PresetsPage() {
     );
   }
 
+  function normalizeJsonText(raw: string): string {
+    // Чистим от iOS-смарт-кавычек, ёлочек, NBSP, BOM.
+    return raw
+      .replace(/^﻿/, "")
+      .replace(/[“”«»]/g, '"')
+      .replace(/[‘’]/g, "'")
+      .replace(/ /g, " ")
+      .trim();
+  }
+
   function importFromText(text: string): { added: number; error?: string } {
     try {
-      const parsed = JSON.parse(text) as
+      const parsed = JSON.parse(normalizeJsonText(text)) as
         | APIPreset
         | APIPreset[]
         | { presets?: APIPreset[] };
@@ -128,8 +161,17 @@ export function PresetsPage() {
         if (!p || typeof p.id !== "string" || typeof p.baseURL !== "string") {
           continue;
         }
+        // Если импортируем поверх существующего пресета (тот же id) и в
+        // импортируемом JSON нет токена (он вырезан при экспорте) — сохраняем
+        // локальный токен. Иначе round-trip теряет токен.
+        const existing = userPresets.find((x) => x.id === p.id);
+        const auth = {
+          ...p.auth,
+          token: p.auth?.token ?? existing?.auth?.token,
+        };
         saveUserPreset({
           ...p,
+          auth,
           endpoints: Array.isArray(p.endpoints) ? p.endpoints : [],
           defaultHeaders: Array.isArray(p.defaultHeaders)
             ? p.defaultHeaders
@@ -375,6 +417,52 @@ export function PresetsPage() {
           if (!r.error && r.added > 0) setImportOpen(false);
         }}
       />
+      <ManualCopyModal
+        data={manualCopy}
+        onClose={() => setManualCopy(null)}
+      />
+    </div>
+  );
+}
+
+/* ─── Fallback: ручное копирование когда clipboard API закрыт (iOS PWA) ─── */
+function ManualCopyModal({
+  data,
+  onClose,
+}: {
+  data: { text: string; label: string } | null;
+  onClose: () => void;
+}) {
+  if (!data) return null;
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        <div className="modal-header">
+          <h2 className="modal-title">Копирование</h2>
+        </div>
+        <div className="modal-body">
+          <p style={{ marginBottom: 12, color: "var(--text-secondary)", fontSize: 13 }}>
+            Браузер не дал автоматически положить текст в буфер. Выдели всё и
+            нажми «Копировать» руками (Cmd/Ctrl+A → Cmd/Ctrl+C).
+          </p>
+          <textarea
+            className="body-textarea"
+            style={{ minHeight: 200, fontFamily: "var(--font-mono)" }}
+            value={data.text}
+            readOnly
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="none"
+            autoComplete="off"
+            onFocus={(e) => e.currentTarget.select()}
+          />
+        </div>
+        <div className="modal-footer">
+          <button type="button" className="btn btn--primary" onClick={onClose}>
+            Готово
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -432,6 +520,10 @@ function ImportModal({
             value={text}
             onChange={(e) => setText(e.target.value)}
             spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="none"
+            autoComplete="off"
+            inputMode="text"
             autoFocus
           />
         </div>
