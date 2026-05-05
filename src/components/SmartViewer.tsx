@@ -876,6 +876,18 @@ function isObj(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
 }
 
+function statusBadge(status: number | null): { label: string; tone: "success" | "warn" | "error" | "neutral" } | null {
+  if (status === null) return null;
+  if (status === 200) return { label: "OK", tone: "success" };
+  if (status >= 300 && status < 400) return { label: "redir", tone: "success" };
+  if (status === 404) return { label: "нет", tone: "neutral" };
+  if (status === 403) return { label: "блок", tone: "warn" };
+  if (status === 429) return { label: "лимит", tone: "warn" };
+  if (status >= 500) return { label: "err", tone: "error" };
+  if (status >= 400) return { label: "ошб", tone: "error" };
+  return { label: String(status), tone: "neutral" };
+}
+
 function SitesList({ items }: { items: Array<Record<string, unknown>> }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 6 }}>
@@ -883,6 +895,7 @@ function SitesList({ items }: { items: Array<Record<string, unknown>> }) {
         const name = typeof s.site === "string" ? s.site : "?";
         const url = typeof s.url === "string" ? s.url : null;
         const status = typeof s.status === "number" ? s.status : null;
+        const badge = statusBadge(status);
         return (
           <a
             key={i}
@@ -908,8 +921,14 @@ function SitesList({ items }: { items: Array<Record<string, unknown>> }) {
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {name}
             </span>
-            {status !== null && (
-              <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{status}</span>
+            {badge && (
+              <span
+                className="status-badge"
+                data-tone={badge.tone}
+                style={{ height: 16, fontSize: 9, padding: "0 6px", flexShrink: 0 }}
+              >
+                {badge.label}
+              </span>
             )}
           </a>
         );
