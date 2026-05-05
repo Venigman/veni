@@ -888,51 +888,111 @@ function statusBadge(status: number | null): { label: string; tone: "success" | 
   return { label: String(status), tone: "neutral" };
 }
 
+const CATEGORY_ORDER: string[] = [
+  "social", "messaging", "media", "dev", "professional", "blogging",
+  "forum", "marketplace", "crypto", "dating", "photo", "news",
+  "gaming", "regional", "other", "nsfw",
+];
+const CATEGORY_LABEL: Record<string, string> = {
+  social: "Соцсети",
+  messaging: "Мессенджеры",
+  media: "Медиа",
+  dev: "Разработка",
+  professional: "Профессиональное",
+  blogging: "Блоги",
+  forum: "Форумы",
+  marketplace: "Маркетплейсы",
+  crypto: "Крипта",
+  dating: "Знакомства",
+  photo: "Фото",
+  news: "Новости",
+  gaming: "Гейминг",
+  regional: "Региональные",
+  other: "Другое",
+  nsfw: "NSFW",
+};
+
 function SitesList({ items }: { items: Array<Record<string, unknown>> }) {
+  // Группируем по category, сортируем по CATEGORY_ORDER
+  const groups = new Map<string, Array<Record<string, unknown>>>();
+  for (const item of items) {
+    const cat = typeof item.category === "string" ? item.category : "other";
+    if (!groups.has(cat)) groups.set(cat, []);
+    groups.get(cat)!.push(item);
+  }
+  const sortedCats = [...groups.keys()].sort((a, b) => {
+    const ia = CATEGORY_ORDER.indexOf(a);
+    const ib = CATEGORY_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 6 }}>
-      {items.map((s, i) => {
-        const name = typeof s.site === "string" ? s.site : "?";
-        const url = typeof s.url === "string" ? s.url : null;
-        const status = typeof s.status === "number" ? s.status : null;
-        const badge = statusBadge(status);
-        return (
-          <a
-            key={i}
-            href={url || "#"}
-            target="_blank"
-            rel="noopener noreferrer"
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {sortedCats.map((cat) => (
+        <div key={cat}>
+          <div
             style={{
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
-              gap: 6,
-              padding: "6px 8px",
-              border: "1px solid var(--border-muted)",
-              borderRadius: "var(--radius-sm)",
-              background: "var(--bg-overlay)",
-              color: "var(--text-primary)",
-              textDecoration: "none",
+              gap: 8,
               fontFamily: "var(--font-mono)",
-              fontSize: 11,
-              cursor: url ? "pointer" : "default",
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+              color: "var(--text-muted)",
+              marginBottom: 6,
             }}
           >
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {name}
-            </span>
-            {badge && (
-              <span
-                className="status-badge"
-                data-tone={badge.tone}
-                style={{ height: 16, fontSize: 9, padding: "0 6px", flexShrink: 0 }}
-              >
-                {badge.label}
-              </span>
-            )}
-          </a>
-        );
-      })}
+            <span>{CATEGORY_LABEL[cat] || cat}</span>
+            <span style={{ color: "var(--text-secondary)" }}>{groups.get(cat)!.length}</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 6 }}>
+            {groups.get(cat)!.map((s, i) => {
+              const name = typeof s.site === "string" ? s.site : "?";
+              const url = typeof s.url === "string" ? s.url : null;
+              const status = typeof s.status === "number" ? s.status : null;
+              const badge = statusBadge(status);
+              return (
+                <a
+                  key={i}
+                  href={url || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 6,
+                    padding: "6px 8px",
+                    border: "1px solid var(--border-muted)",
+                    borderRadius: "var(--radius-sm)",
+                    background: "var(--bg-overlay)",
+                    color: "var(--text-primary)",
+                    textDecoration: "none",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 11,
+                    cursor: url ? "pointer" : "default",
+                  }}
+                >
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {name}
+                  </span>
+                  {badge && (
+                    <span
+                      className="status-badge"
+                      data-tone={badge.tone}
+                      style={{ height: 16, fontSize: 9, padding: "0 6px", flexShrink: 0 }}
+                    >
+                      {badge.label}
+                    </span>
+                  )}
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
