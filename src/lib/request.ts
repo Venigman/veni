@@ -272,6 +272,8 @@ async function consumeSSE(args: {
     const checked = stats?.checked ?? 0;
     const hits = stats?.hits ?? sites.length;
     const elapsed = doneEvent?.elapsed_ms ?? Math.round(performance.now() - t0);
+    // ВАЖНО: каждый snapshot должен иметь НОВЫЕ ссылки на data, results, sites,
+    // иначе React.setState не ререндерит (memoize по reference equality).
     const data = {
       ok: true,
       command: "username",
@@ -282,7 +284,7 @@ async function consumeSSE(args: {
         usersearcher: {
           ok: true,
           found: `${hits} sites`,
-          sites,
+          sites: sites.slice(),  // копия массива
           checked_total: checked,
           errors: stats?.errors ?? 0,
         },
