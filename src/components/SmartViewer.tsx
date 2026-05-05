@@ -798,6 +798,22 @@ function OsintToolBlock({ name, result }: { name: string; result: Record<string,
         {!ok && typeof result.error === "string" && (
           <span style={{ color: "var(--text-secondary)" }}>→ {result.error}</span>
         )}
+        <span style={{ flex: 1 }} />
+        {typeof result.checked_total === "number" && (
+          <span style={{ color: "var(--text-muted)", fontSize: 11 }}>
+            {result.checked_total} проверено
+          </span>
+        )}
+        {typeof result.errors === "number" && result.errors > 0 && (
+          <span
+            className="status-badge"
+            data-tone="warn"
+            style={{ height: 16, fontSize: 9, padding: "0 6px" }}
+            title="Сайтов с timeout/network/прочие ошибки"
+          >
+            {result.errors} err
+          </span>
+        )}
       </div>
       <div style={{ padding: "8px 12px" }}>
         <OsintToolBody result={result} />
