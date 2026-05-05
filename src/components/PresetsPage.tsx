@@ -10,11 +10,8 @@ import {
   ChevronRight,
   Upload,
   Copy,
-  Sparkles,
   Loader2,
 } from "lucide-react";
-import { generatePreset, loadAIConfig } from "../lib/ai";
-import { AISettingsModal } from "./AISettingsModal";
 import { useAPIs } from "../context/APIs";
 import {
   PRESET_CATEGORIES,
@@ -545,69 +542,10 @@ function PresetModal({
   const [draft, setDraft] = useState<APIPreset>(preset ?? emptyPreset());
   const firstFieldRef = useRef<HTMLInputElement>(null);
   const isNew = !preset?.name;
-  const [aiOpen, setAiOpen] = useState(false);
-  const [aiBusy, setAiBusy] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
-  const [aiProgress, setAiProgress] = useState<string | null>(null);
-
-  const aiCanRun =
-    draft.name.trim().length > 0 && /^https?:\/\//i.test(draft.baseURL.trim());
-
-  async function runAI() {
-    setAiError(null);
-    setAiProgress(null);
-    if (!loadAIConfig()) {
-      setAiOpen(true);
-      return;
-    }
-    setAiBusy(true);
-    try {
-      const res = await generatePreset({
-        apiName: draft.name.trim(),
-        baseURL: draft.baseURL.trim(),
-        authKind: draft.auth.kind,
-        authHeaderName: draft.auth.headerName,
-        authQueryName: draft.auth.queryName,
-        probeToken: draft.auth.token?.trim() || undefined,
-        onProgress: (m) => setAiProgress(m),
-        onCategories: (cats) =>
-          setDraft((d) => ({
-            ...d,
-            endpointCategories: cats,
-          })),
-        onEndpoint: (ep) =>
-          setDraft((d) => ({
-            ...d,
-            endpoints: [...d.endpoints, ep],
-          })),
-      });
-      if (res.noRestApi) {
-        setAiError(res.noRestApi);
-      } else if (res.added === 0) {
-        setAiError(
-          res.finalText
-            ? `ИИ не добавил действий. Ответ: ${res.finalText.slice(0, 200)}`
-            : "ИИ не добавил действий и не объяснил почему. Попробуй сменить модель в Настройках."
-        );
-      } else {
-        setAiProgress(`Добавлено ${res.added} действий`);
-        setTimeout(() => setAiProgress(null), 4000);
-      }
-    } catch (e) {
-      setAiError((e as Error).message);
-    } finally {
-      setAiBusy(false);
-    }
-  }
 
   useEffect(() => {
     if (open) {
       setDraft(preset ?? emptyPreset());
-      // Сброс AI-состояния при открытии/переключении пресета:
-      // иначе старое сообщение «нет REST API» висит на новом пресете.
-      setAiError(null);
-      setAiProgress(null);
-      setAiBusy(false);
       setTimeout(() => firstFieldRef.current?.focus(), 50);
     }
   }, [open, preset]);
@@ -801,74 +739,6 @@ function PresetModal({
             onChange={(rows) => update({ defaultHeaders: rows })}
           />
 
-          <div
-            className="ai-suggest"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              flexWrap: "wrap",
-              padding: "10px 12px",
-              background: "rgba(56, 139, 253, 0.08)",
-              border: "1px solid rgba(56, 139, 253, 0.2)",
-              borderRadius: "var(--radius-sm)",
-              marginBottom: 12,
-            }}
-          >
-            <Sparkles
-              size={14}
-              strokeWidth={1.8}
-              style={{
-                color: aiError ? "var(--status-high)" : "var(--status-info)",
-                flexShrink: 0,
-              }}
-            />
-            <span style={{
-              flex: 1,
-              minWidth: 180,
-              fontSize: 12,
-              color: aiError ? "var(--status-high)" : "var(--text-secondary)",
-              lineHeight: 1.45,
-            }}>
-              {aiError
-                ? aiError
-                : aiProgress
-                  ? aiProgress
-                  : "Подберёт действия и категории по имени и URL"}
-            </span>
-            <button
-              type="button"
-              className="btn btn--ghost"
-              style={{ height: 28 }}
-              onClick={() => setAiOpen(true)}
-              disabled={aiBusy}
-              title="Настроить ИИ-ключ"
-            >
-              Настроить
-            </button>
-            <button
-              type="button"
-              className="btn btn--primary"
-              style={{ height: 28 }}
-              onClick={runAI}
-              disabled={aiBusy || !aiCanRun}
-              title={
-                aiCanRun
-                  ? "Запустить ИИ"
-                  : "Сначала заполни Название и Base URL"
-              }
-            >
-              {aiBusy ? (
-                <Loader2 size={13} strokeWidth={2} className="spin" />
-              ) : (
-                <Sparkles size={13} strokeWidth={1.8} />
-              )}
-              <span style={{ marginLeft: 8 }}>
-                {aiBusy ? "Думаю…" : "Подобрать"}
-              </span>
-            </button>
-          </div>
-
           <EndpointsEditor
             rows={draft.endpoints}
             categories={draft.endpointCategories ?? []}
@@ -886,7 +756,6 @@ function PresetModal({
           </button>
         </div>
       </form>
-      <AISettingsModal open={aiOpen} onClose={() => setAiOpen(false)} />
     </div>
   );
 }
