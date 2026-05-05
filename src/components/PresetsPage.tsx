@@ -21,6 +21,7 @@ import {
 import type { AuthKind } from "../lib/storage";
 import { uid } from "../lib/storage";
 import { Dropdown } from "./Dropdown";
+import { ActionsMenu } from "./ActionsMenu";
 
 const METHODS: PresetEndpoint["method"][] = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
@@ -262,41 +263,34 @@ export function PresetsPage() {
                   preset={p}
                   onApply={() => applyPreset(p)}
                   actions={
-                    <>
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        title="Скопировать JSON в буфер"
-                        onClick={() => exportOne(p)}
-                      >
-                        <Copy size={14} strokeWidth={1.6} />
-                      </button>
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        title="Редактировать"
-                        onClick={() => setEditing(p)}
-                      >
-                        <Pencil size={14} strokeWidth={1.6} />
-                      </button>
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        data-danger={confirming}
-                        title={confirming ? "Точно удалить?" : "Удалить"}
-                        onClick={() => {
-                          if (confirming) {
-                            removeUserPreset(p.id);
-                            setConfirmingId(null);
-                          } else {
-                            setConfirmingId(p.id);
-                            setTimeout(() => setConfirmingId(null), 2500);
-                          }
-                        }}
-                      >
-                        <Trash2 size={14} strokeWidth={1.6} />
-                      </button>
-                    </>
+                    <ActionsMenu
+                      items={[
+                        {
+                          label: "Скопировать",
+                          icon: <Copy size={13} strokeWidth={1.6} />,
+                          onClick: () => exportOne(p),
+                        },
+                        {
+                          label: "Редактировать",
+                          icon: <Pencil size={13} strokeWidth={1.6} />,
+                          onClick: () => setEditing(p),
+                        },
+                        {
+                          label: confirming ? "Точно удалить?" : "Удалить",
+                          icon: <Trash2 size={13} strokeWidth={1.6} />,
+                          danger: true,
+                          onClick: () => {
+                            if (confirming) {
+                              removeUserPreset(p.id);
+                              setConfirmingId(null);
+                            } else {
+                              setConfirmingId(p.id);
+                              setTimeout(() => setConfirmingId(null), 2500);
+                            }
+                          },
+                        },
+                      ]}
+                    />
                   }
                 />
               );
@@ -311,41 +305,34 @@ export function PresetsPage() {
                   source="claude"
                   sourceTag="Claude"
                   actions={
-                    <>
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        title="Скопировать JSON в буфер"
-                        onClick={() => exportOne(p)}
-                      >
-                        <Copy size={14} strokeWidth={1.6} />
-                      </button>
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        title="Редактировать"
-                        onClick={() => setEditing(p)}
-                      >
-                        <Pencil size={14} strokeWidth={1.6} />
-                      </button>
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        data-danger={confirming}
-                        title={confirming ? "Точно удалить?" : "Удалить"}
-                        onClick={() => {
-                          if (confirming) {
-                            void removeSeedPreset(p.id);
-                            setConfirmingId(null);
-                          } else {
-                            setConfirmingId(p.id);
-                            setTimeout(() => setConfirmingId(null), 2500);
-                          }
-                        }}
-                      >
-                        <Trash2 size={14} strokeWidth={1.6} />
-                      </button>
-                    </>
+                    <ActionsMenu
+                      items={[
+                        {
+                          label: "Скопировать",
+                          icon: <Copy size={13} strokeWidth={1.6} />,
+                          onClick: () => exportOne(p),
+                        },
+                        {
+                          label: "Редактировать",
+                          icon: <Pencil size={13} strokeWidth={1.6} />,
+                          onClick: () => setEditing(p),
+                        },
+                        {
+                          label: confirming ? "Точно удалить?" : "Удалить",
+                          icon: <Trash2 size={13} strokeWidth={1.6} />,
+                          danger: true,
+                          onClick: () => {
+                            if (confirming) {
+                              void removeSeedPreset(p.id);
+                              setConfirmingId(null);
+                            } else {
+                              setConfirmingId(p.id);
+                              setTimeout(() => setConfirmingId(null), 2500);
+                            }
+                          },
+                        },
+                      ]}
+                    />
                   }
                 />
               );
