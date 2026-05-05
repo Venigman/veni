@@ -182,6 +182,11 @@ export function Workspace() {
     }
 
     setRunning(true);
+    setResult(null);
+    // Если путь — username (или явно request эндпоинта что-то возвращает SSE),
+    // включаем прогрессивный onStreamEvent: каждый hit/progress сразу
+    // обновляет result, чтобы юзер видел сайты по мере появления.
+    const wantsStream = /\/api\/v1\/username\b/.test(usePath);
     const res = await runRequest({
       api: active,
       method: useMethod,
@@ -190,6 +195,11 @@ export function Workspace() {
       query,
       body: useBody,
       file: acceptsFile && file ? file : undefined,
+      onStreamEvent: wantsStream
+        ? (_ev, snapshot) => {
+            setResult(snapshot);
+          }
+        : undefined,
     });
     setResult(res);
     setRunning(false);
