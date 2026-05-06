@@ -44,6 +44,7 @@ export function Workspace() {
   // Mobile-only: Request panel can be collapsed so the user can read Response
   // full-screen. Open by default. The toggle button only shows on mobile (CSS).
   const [requestCollapsed, setRequestCollapsed] = useState(false);
+  const [responseSearch, setResponseSearch] = useState("");
 
   // Reset request scratchpad when API switches
   useEffect(() => {
@@ -489,6 +490,24 @@ export function Workspace() {
           <div className="panel-header">
             <h3 className="panel-title">Response</h3>
             {result && (
+              <input
+                type="text"
+                className="kv-input"
+                value={responseSearch}
+                onChange={(e) => setResponseSearch(e.target.value)}
+                placeholder="🔍  поиск в ответе"
+                spellCheck={false}
+                style={{
+                  height: 26,
+                  flex: "1 1 160px",
+                  minWidth: 100,
+                  maxWidth: 280,
+                  fontSize: 12,
+                  margin: "0 12px",
+                }}
+              />
+            )}
+            {result && (
               <div className="panel-meta">
                 <span
                   className="status-badge"
@@ -523,6 +542,7 @@ export function Workspace() {
                 currentRequestPath={result.requestPath}
                 apiBaseURL={active.baseURL}
                 apiToken={active.auth?.token}
+                searchQuery={responseSearch}
                 onNavigateFile={(entry, currentPath) => {
                   // Стратегия: меняем хвост path после `/contents/` на entry.path.
                   // Пример: /repos/o/r/contents/src/foo + entry "src/bar"

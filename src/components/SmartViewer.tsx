@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -176,6 +176,46 @@ function findFileContent(
   }
 }
 
+// Context для пробрасывания поисковой строки во все view-компоненты.
+const SearchContext = createContext<string>("");
+
+/** HL — оборачивает текст с подсветкой совпадений из SearchContext.
+ *  Если поиск пуст или не нашло — рендерит текст как есть. */
+function HL({ text }: { text: string }) {
+  const q = useContext(SearchContext);
+  if (!q) return <>{text}</>;
+  const lc = text.toLowerCase();
+  const ql = q.toLowerCase();
+  const idx = lc.indexOf(ql);
+  if (idx < 0) return <>{text}</>;
+  const parts: React.ReactNode[] = [];
+  let cur = 0;
+  let n = 0;
+  while (true) {
+    const found = lc.indexOf(ql, cur);
+    if (found < 0) {
+      parts.push(text.slice(cur));
+      break;
+    }
+    if (found > cur) parts.push(text.slice(cur, found));
+    parts.push(
+      <mark
+        key={n++}
+        style={{
+          background: "var(--status-med, #d2992c)",
+          color: "var(--bg-canvas, #0d1117)",
+          padding: "0 2px",
+          borderRadius: 2,
+        }}
+      >
+        {text.slice(found, found + q.length)}
+      </mark>
+    );
+    cur = found + q.length;
+  }
+  return <>{parts}</>;
+}
+
 interface Props {
   data: unknown;
   rawText: string;
@@ -193,6 +233,8 @@ interface Props {
   apiBaseURL?: string;
   /** Bearer-токен текущего таба — для авторизации при fetch медиа. */
   apiToken?: string;
+  /** Поисковая строка из шапки Response — подсвечивает совпадения во всех текст-табах. */
+  searchQuery?: string;
 }
 
 /** Возвращает media-ссылку если ответ ноды содержит filename и либо kind,
@@ -293,7 +335,9 @@ export function SmartViewer({
   currentRequestPath,
   apiBaseURL,
   apiToken,
+  searchQuery,
 }: Props) {
+  const q = (searchQuery ?? "").trim();
   const primaryArray = useMemo(() => findPrimaryArray(data), [data]);
   const humanText = useMemo(() => findHumanText(data), [data]);
   const fileContent = useMemo(() => findFileContent(data), [data]);
@@ -306,6 +350,7 @@ export function SmartViewer({
       data !== undefined &&
       (typeof data === "object" || typeof data === "string"));
   // Приоритет: media (одиночный) → mediaList → file → files → pretty → table → tree.
+  const [search, setSearch] = useState("");
   const [mode, setMode] = useState<ViewMode>(
     media && apiBaseURL
       ? "media"
@@ -418,14 +463,16 @@ export function SmartViewer({
           onNavigate={onNavigateFile}
         />
       )}
-      {mode === "pretty" && <PrettyView value={data} humanText={humanText} />}
-      {mode === "tree" && <TreeView value={data} />}
-      {mode === "table" && primaryArray && <TableView rows={primaryArray} />}
-      {mode === "raw" && (
-        <pre className="response-area" style={{ margin: 0 }}>
-          {rawText}
-        </pre>
-      )}
+      <SearchContext.Provider value={q}>
+        {mode === "pretty" && <PrettyView value={data} humanText={humanText} />}
+        {mode === "tree" && <TreeView value={data} />}
+        {mode === "table" && primaryArray && <TableView rows={primaryArray} />}
+        {mode === "raw" && (
+          <pre className="response-area" style={{ margin: 0 }}>
+            <HL text={rawText} />
+          </pre>
+        )}
+      </SearchContext.Provider>
     </div>
   );
 }
@@ -470,7 +517,9 @@ function TreeNode({
       </div>
     );
   }
-  const keyEl = keyName !== undefined ? <span className="json-key">"{keyName}"</span> : null;
+  const keyEl = keyName !== undefined ? (
+    <span className="json-key">"<HL text={keyName} />"</span>
+  ) : null;
   const colon = keyName !== undefined ? <span className="json-punct">: </span> : null;
   const comma = !isLast && !isRoot ? <span className="json-punct">,</span> : null;
 
@@ -489,7 +538,7 @@ function TreeNode({
       <div style={indent}>
         {keyEl}
         {colon}
-        <span className="json-str">"{value}"</span>
+        <span className="json-str">"<HL text={value} />"</span>
         {comma}
       </div>
     );
@@ -499,7 +548,7 @@ function TreeNode({
       <div style={indent}>
         {keyEl}
         {colon}
-        <span className="json-num">{value}</span>
+        <span className="json-num"><HL text={String(value)} /></span>
         {comma}
       </div>
     );
@@ -647,7 +696,7 @@ function TableView({ rows }: { rows: unknown[] }) {
                         }}
                         title={previewCell(obj[c])}
                       >
-                        {previewCell(obj[c])}
+                        <HL text={previewCell(obj[c])} />
                       </span>
                     </td>
                   ))}
@@ -997,7 +1046,7 @@ function SitesList({ items }: { items: Array<Record<string, unknown>> }) {
                   }}
                 >
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {name}
+                    <HL text={name} />
                   </span>
                   {badge && (
                     <span
@@ -1062,7 +1111,7 @@ function CategorizedLinks({ items }: { items: Array<Record<string, unknown>> }) 
                     fontSize: 11,
                   }}
                 >
-                  {name}
+                  <HL text={name} />
                 </a>
               );
             })}
@@ -1234,10 +1283,10 @@ function PrettyAny({ value }: { value: unknown }) {
     return <span className="pretty-muted">—</span>;
   }
   if (typeof value === "string") {
-    return <span className="pretty-string">{value}</span>;
+    return <span className="pretty-string"><HL text={value} /></span>;
   }
   if (typeof value === "number" || typeof value === "boolean") {
-    return <span className="pretty-scalar">{String(value)}</span>;
+    return <span className="pretty-scalar"><HL text={String(value)} /></span>;
   }
   if (Array.isArray(value)) {
     if (value.length === 0) return <span className="pretty-muted">пусто</span>;
