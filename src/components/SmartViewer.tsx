@@ -803,6 +803,20 @@ function PrettyView({
 
 function FanOutView({ data }: { data: FanOutResult }) {
   const entries = Object.entries(data.results);
+  // Если у любого результата есть поле `country` — группируем по нему.
+  // Универсально: любой бэк с тулзами + country-полем получит группировку.
+  const hasCountry = entries.some(
+    ([, r]) => typeof (r as Record<string, unknown>).country === "string"
+  );
+  const groups = new Map<string, Array<[string, Record<string, unknown>]>>();
+  for (const [name, result] of entries) {
+    const c = typeof (result as Record<string, unknown>).country === "string"
+      ? ((result as Record<string, unknown>).country as string)
+      : "—";
+    if (!groups.has(c)) groups.set(c, []);
+    groups.get(c)!.push([name, result]);
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div
@@ -823,9 +837,35 @@ function FanOutView({ data }: { data: FanOutResult }) {
         <span>{data.tools_ok}/{data.tools_total} tools</span>
         {typeof data.took_ms === "number" && <span>· {data.took_ms} ms</span>}
       </div>
-      {entries.map(([toolName, result]) => (
-        <ToolResultBlock key={toolName} name={toolName} result={result} />
-      ))}
+      {hasCountry
+        ? [...groups.entries()].map(([country, items]) => (
+            <div key={country} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  paddingTop: 4, paddingBottom: 2,
+                  borderBottom: "1px solid var(--border-muted)",
+                }}
+              >
+                <span
+                  className="status-badge"
+                  data-tone="neutral"
+                  style={{ height: 18, fontSize: 10, padding: "0 8px" }}
+                >
+                  {country.toUpperCase()}
+                </span>
+                <span style={{ color: "var(--text-muted)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
+                  {items.length}
+                </span>
+              </div>
+              {items.map(([toolName, result]) => (
+                <ToolResultBlock key={toolName} name={toolName} result={result} />
+              ))}
+            </div>
+          ))
+        : entries.map(([toolName, result]) => (
+            <ToolResultBlock key={toolName} name={toolName} result={result} />
+          ))}
     </div>
   );
 }
