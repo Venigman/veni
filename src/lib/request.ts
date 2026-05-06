@@ -269,6 +269,9 @@ async function consumeSSE(args: {
   const reader = res.body!.getReader();
   const decoder = new TextDecoder("utf-8");
   let buf = "";
+  // Накапливаем сырой SSE-стрим для таба Raw — то что юзер видит как
+  // "сырой ответ". Это нужно даже в стрим-режиме — иначе таб Raw пустой.
+  let rawStream = "";
 
   // Username-сценарий: накапливаем sites
   const sites: Array<Record<string, unknown>> = [];
@@ -339,7 +342,7 @@ async function consumeSSE(args: {
       contentType,
       size: 0,
       data,
-      rawText: "",
+      rawText: rawStream,
       responseHeaders,
       displayURL,
       requestPath: path.split("?")[0] || path,
@@ -406,7 +409,9 @@ async function consumeSSE(args: {
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
-      buf += decoder.decode(value, { stream: true });
+      const decoded = decoder.decode(value, { stream: true });
+      rawStream += decoded;
+      buf += decoded;
       let sep: number;
       while ((sep = buf.indexOf("\n\n")) >= 0) {
         const chunk = buf.slice(0, sep);
