@@ -137,8 +137,10 @@ export async function runRequest(input: RunInput): Promise<RunResult> {
 
   // Streaming-режим: если caller дал onStreamEvent — просим SSE.
   const wantStream = typeof onStreamEvent === "function";
-  if (wantStream) {
-    reqHeaders.set("Accept", "text/event-stream");
+  if (wantStream && !reqHeaders.has("accept")) {
+    // Принимаем оба формата: бэк решит что вернуть. SSE → парсим как стрим,
+    // JSON/текст → обычный путь. Без хардкода под конкретный эндпоинт.
+    reqHeaders.set("Accept", "text/event-stream, application/json, */*;q=0.5");
   }
 
   if (file) {

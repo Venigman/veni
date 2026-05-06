@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Send, Trash2, Loader2, ChevronRight, ChevronDown, Paperclip, X as XIcon } from "lucide-react";
+import { Plus, Send, Trash2, Loader2, ChevronRight, ChevronDown, Paperclip, Search, X as XIcon } from "lucide-react";
 import { useAPIs } from "../context/APIs";
 import { runRequest, type RunResult } from "../lib/request";
 import { SmartViewer } from "./SmartViewer";
@@ -184,10 +184,10 @@ export function Workspace() {
 
     setRunning(true);
     setResult(null);
-    // Если путь — username (или явно request эндпоинта что-то возвращает SSE),
-    // включаем прогрессивный onStreamEvent: каждый hit/progress сразу
-    // обновляет result, чтобы юзер видел сайты по мере появления.
-    const wantsStream = /\/api\/v1\/username\b/.test(usePath);
+    // Универсально: всегда подписываемся на стрим. Если бэк отдаст
+    // text/event-stream — request.ts сам распарсит SSE и вызовет
+    // onStreamEvent на каждом событии. Если JSON — обычный путь.
+    // Без хардкода под конкретный API.
     const res = await runRequest({
       api: active,
       method: useMethod,
@@ -196,11 +196,9 @@ export function Workspace() {
       query,
       body: useBody,
       file: acceptsFile && file ? file : undefined,
-      onStreamEvent: wantsStream
-        ? (_ev, snapshot) => {
-            setResult(snapshot);
-          }
-        : undefined,
+      onStreamEvent: (_ev, snapshot) => {
+        setResult(snapshot);
+      },
     });
     setResult(res);
     setRunning(false);
@@ -490,22 +488,42 @@ export function Workspace() {
           <div className="panel-header">
             <h3 className="panel-title">Response</h3>
             {result && (
-              <input
-                type="text"
-                className="kv-input"
-                value={responseSearch}
-                onChange={(e) => setResponseSearch(e.target.value)}
-                placeholder="🔍  поиск в ответе"
-                spellCheck={false}
+              <div
                 style={{
-                  height: 26,
+                  position: "relative",
                   flex: "1 1 160px",
                   minWidth: 100,
                   maxWidth: 280,
-                  fontSize: 12,
                   margin: "0 12px",
                 }}
-              />
+              >
+                <Search
+                  size={12}
+                  strokeWidth={1.8}
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: 8,
+                    transform: "translateY(-50%)",
+                    color: "var(--text-muted)",
+                    pointerEvents: "none",
+                  }}
+                />
+                <input
+                  type="text"
+                  className="kv-input"
+                  value={responseSearch}
+                  onChange={(e) => setResponseSearch(e.target.value)}
+                  placeholder="поиск в ответе"
+                  spellCheck={false}
+                  style={{
+                    width: "100%",
+                    height: 26,
+                    fontSize: 12,
+                    paddingLeft: 26,
+                  }}
+                />
+              </div>
             )}
             {result && (
               <div className="panel-meta">
