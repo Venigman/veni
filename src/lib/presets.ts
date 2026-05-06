@@ -1,6 +1,4 @@
-import type { AuthKind } from "./storage";
-
-export type EndpointStatus = "ready" | "soon" | "wip" | "broken";
+import type { AuthKind, EndpointStatus } from "./storage";
 
 export interface PresetEndpoint {
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -82,9 +80,6 @@ export const PRESET_CATEGORIES: PresetCategory[] = [
   "Открытые API",
 ];
 
-export const PRESETS: APIPreset[] = [
-];
-
 const USER_PRESETS_KEY = "veni.userPresets.v1";
 
 export function loadUserPresets(): APIPreset[] {
@@ -98,40 +93,4 @@ export function loadUserPresets(): APIPreset[] {
 
 export function saveUserPresets(list: APIPreset[]) {
   localStorage.setItem(USER_PRESETS_KEY, JSON.stringify(list));
-}
-
-/** Filter presets by query (matches name, category, baseURL hostname). */
-export function filterPresets(
-  query: string,
-  source: APIPreset[] = PRESETS
-): APIPreset[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return source;
-  return source.filter((p) => {
-    const haystack = [
-      p.name,
-      p.category,
-      p.baseURL,
-      ...p.endpoints.map((e) => e.label),
-    ]
-      .join(" ")
-      .toLowerCase();
-    return haystack.includes(q);
-  });
-}
-
-/** Group presets by category, preserving the canonical category order. */
-export function groupByCategory(
-  list: APIPreset[]
-): Array<{ category: PresetCategory; items: APIPreset[] }> {
-  const map = new Map<PresetCategory, APIPreset[]>();
-  for (const p of list) {
-    const arr = map.get(p.category) ?? [];
-    arr.push(p);
-    map.set(p.category, arr);
-  }
-  return PRESET_CATEGORIES.filter((c) => map.has(c)).map((c) => ({
-    category: c,
-    items: map.get(c)!,
-  }));
 }
