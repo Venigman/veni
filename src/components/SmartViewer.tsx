@@ -113,9 +113,9 @@ const HUMAN_FIELDS = [
 
 function findHumanText(value: unknown): string | null {
   if (typeof value !== "object" || value === null) return null;
-  // Osint-fan-out имеет своё поле `text` со сводкой "✓ tool → ..." —
-  // не показываем его как humanText, отдадим OsintFanoutView рендерить блоками.
-  if (isOsintFanout(value)) return null;
+  // Fan-out response имеет своё поле `text` со сводкой "✓ tool → ..." —
+  // не показываем его как humanText, отдадим FanOutView рендерить блоками.
+  if (isFanOutResult(value)) return null;
   for (const key of HUMAN_FIELDS) {
     const v = (value as Record<string, unknown>)[key];
     if (typeof v === "string" && v.trim().length > 0) return v;
@@ -123,7 +123,7 @@ function findHumanText(value: unknown): string | null {
   return null;
 }
 
-function isOsintFanout(value: unknown): value is OsintFanout {
+function isFanOutResult(value: unknown): value is FanOutResult {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
   return (
@@ -135,7 +135,7 @@ function isOsintFanout(value: unknown): value is OsintFanout {
   );
 }
 
-interface OsintFanout {
+interface FanOutResult {
   ok: boolean;
   command: string;
   input?: string;
@@ -765,9 +765,6 @@ function PrettyView({
   value: unknown;
   humanText: string | null;
 }) {
-  if (isOsintFanout(value)) {
-    return <OsintFanoutView data={value} />;
-  }
   if (humanText !== null) {
     return (
       <div className="pretty-text">
@@ -782,7 +779,7 @@ function PrettyView({
   );
 }
 
-function OsintFanoutView({ data }: { data: OsintFanout }) {
+function FanOutView({ data }: { data: FanOutResult }) {
   const entries = Object.entries(data.results);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -805,13 +802,13 @@ function OsintFanoutView({ data }: { data: OsintFanout }) {
         {typeof data.took_ms === "number" && <span>· {data.took_ms} ms</span>}
       </div>
       {entries.map(([toolName, result]) => (
-        <OsintToolBlock key={toolName} name={toolName} result={result} />
+        <ToolResultBlock key={toolName} name={toolName} result={result} />
       ))}
     </div>
   );
 }
 
-function OsintToolBlock({ name, result }: { name: string; result: Record<string, unknown> }) {
+function ToolResultBlock({ name, result }: { name: string; result: Record<string, unknown> }) {
   const ok = result.ok === true;
   const found = typeof result.found === "string" ? result.found : null;
   return (
@@ -865,13 +862,13 @@ function OsintToolBlock({ name, result }: { name: string; result: Record<string,
         )}
       </div>
       <div style={{ padding: "8px 12px" }}>
-        <OsintToolBody result={result} />
+        <ToolResultBody result={result} />
       </div>
     </div>
   );
 }
 
-function OsintToolBody({ result }: { result: Record<string, unknown> }) {
+function ToolResultBody({ result }: { result: Record<string, unknown> }) {
   // 1. username/sherlock — массив sites: [{site, url, status}] + github_profile (опц.)
   const sites = result.sites;
   if (Array.isArray(sites) && sites.length && isObj(sites[0]) && typeof (sites[0] as Record<string, unknown>).url === "string") {
@@ -1301,6 +1298,15 @@ function PrettyAny({ value }: { value: unknown }) {
     );
   }
   if (typeof value === "object") {
+    // 1) Fan-out форма: {tools_total, tools_ok, results: {tool: {...}}}
+    //    Любой бэк может вернуть такую структуру → красивый рендер по тулзам.
+    if (isFanOutResult(value)) {
+      return <FanOutView data={value} />;
+    }
+    // 2) Эвристики на конкретные поля внутри объекта.
+    const heuristic = renderHeuristic(value as Record<string, unknown>);
+    if (heuristic) return heuristic;
+    // 3) Default: key-value таблица.
     const entries = Object.entries(value as Record<string, unknown>);
     return (
       <div className="pretty-object">
@@ -1316,6 +1322,53 @@ function PrettyAny({ value }: { value: unknown }) {
     );
   }
   return <span>{String(value)}</span>;
+}
+
+/** Data-driven эвристики: распознаёт формы данных и рисует красивые
+ *  компоненты (карточки, чипы, DNS-блоки). Без знания о конкретном API.
+ *  Если объект не подходит ни под одну форму — возвращает null. */
+function renderHeuristic(obj: Record<string, unknown>): React.ReactNode | null {
+  // Массив объектов с url + status → карточки сайтов
+  if (Array.isArray(obj.sites) && obj.sites.length && isObj(obj.sites[0]) && typeof (obj.sites[0] as Record<string, unknown>).url === "string") {
+    const ghp = isObj(obj.github_profile) ? (obj.github_profile as Record<string, unknown>) : null;
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <SitesList items={obj.sites as Array<Record<string, unknown>>} />
+        {ghp && <GithubProfile profile={ghp} />}
+      </div>
+    );
+  }
+  // Массив [{category, name, url}] → карточки сгруппированные по категориям
+  if (Array.isArray(obj.links) && obj.links.length && isObj(obj.links[0])) {
+    const first = obj.links[0] as Record<string, unknown>;
+    if (typeof first.url === "string" && typeof first.category === "string") {
+      return <CategorizedLinks items={obj.links as Array<Record<string, unknown>>} />;
+    }
+  }
+  // Массив строк → чипы
+  if (Array.isArray(obj.subdomains) && obj.subdomains.length && typeof obj.subdomains[0] === "string") {
+    return <ChipList items={obj.subdomains as string[]} kind="domain" />;
+  }
+  if (Array.isArray(obj.services) && obj.services.length && typeof obj.services[0] === "string") {
+    return <ChipList items={obj.services as string[]} kind="text" />;
+  }
+  // Permutations домена
+  if (Array.isArray(obj.permutations) && obj.permutations.length && isObj(obj.permutations[0]) && typeof (obj.permutations[0] as Record<string, unknown>).domain === "string") {
+    return <DomainPermsList items={obj.permutations as Array<Record<string, unknown>>} />;
+  }
+  // DNS-records {A: [...], MX: [...]}
+  if (isObj(obj.records)) {
+    return <DnsRecords records={obj.records as Record<string, unknown>} />;
+  }
+  // Wayback first/last
+  if (isObj(obj.first) || isObj(obj.last)) {
+    return <WaybackPair first={obj.first} last={obj.last} />;
+  }
+  // GitHub-profile форма (login + html_url)
+  if (typeof obj.login === "string" && typeof obj.html_url === "string") {
+    return <GithubProfile profile={obj} />;
+  }
+  return null;
 }
 
 function prettifyKey(k: string): string {
