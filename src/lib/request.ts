@@ -22,7 +22,8 @@ export interface RunInput {
 }
 
 export type StreamEvent =
-  | { type: "start"; username: string; total: number }
+  // Username SSE-события
+  | { type: "start"; username?: string; total?: number; tools_total?: number; command?: string; input?: unknown }
   | {
       type: "hit";
       site: {
@@ -37,20 +38,26 @@ export type StreamEvent =
     }
   | {
       type: "progress";
-      checked: number;
+      checked?: number;
+      completed?: number;
       total: number;
-      hits: number;
+      hits?: number;
+      ok?: number;
       errors: number;
       elapsed_ms: number;
     }
   | {
       type: "done";
-      checked: number;
-      total: number;
-      hits: number;
+      checked?: number;
+      total?: number;
+      hits?: number;
+      tools_total?: number;
+      tools_ok?: number;
       errors: number;
       elapsed_ms: number;
-    };
+    }
+  // Fan-out SSE-события (любой бэк который отдаёт результаты по тулзам)
+  | { type: "tool"; name: string; result: Record<string, unknown> };
 
 export interface RunResult {
   status: number;
@@ -263,38 +270,67 @@ async function consumeSSE(args: {
   const decoder = new TextDecoder("utf-8");
   let buf = "";
 
+  // Username-сценарий: накапливаем sites
   const sites: Array<Record<string, unknown>> = [];
   let total = 0;
   let username = "";
-  let lastProgress: { checked: number; hits: number; errors: number; elapsed_ms: number } | null = null;
+  // Fan-out сценарий: накапливаем results по имени тулзы
+  const toolResults: Record<string, Record<string, unknown>> = {};
+  let command = "";
+  let inputValue: unknown = null;
+  let mode: "username" | "fanout" = "username";
+  let lastProgress: {
+    checked?: number; completed?: number; hits?: number; ok?: number;
+    errors: number; elapsed_ms: number; total: number;
+  } | null = null;
   let doneEvent: Extract<StreamEvent, { type: "done" }> | null = null;
 
   const buildSnapshot = (): RunResult => {
     const stats = doneEvent ?? lastProgress;
-    const checked = stats?.checked ?? 0;
-    const hits = stats?.hits ?? sites.length;
     const elapsed = doneEvent?.elapsed_ms ?? Math.round(performance.now() - t0);
-    // ВАЖНО: каждый snapshot должен иметь НОВЫЕ ссылки на data, results, sites,
-    // иначе React.setState не ререндерит (memoize по reference equality).
-    const data = {
-      ok: true,
-      command: "username",
-      input: username,
-      tools_total: 1,
-      tools_ok: 1,
-      results: {
-        usersearcher: {
-          ok: true,
-          found: `${hits} sites`,
-          sites: sites.slice(),  // копия массива
-          checked_total: checked,
-          errors: stats?.errors ?? 0,
+    let data: Record<string, unknown>;
+
+    if (mode === "fanout") {
+      // Любой fan-out с потоковыми tool-events: results — словарь по имени тулзы
+      const toolsTotal = doneEvent?.tools_total ?? lastProgress?.total ?? Object.keys(toolResults).length;
+      const okEntries = Object.values(toolResults).filter(
+        (r) => (r as Record<string, unknown>).ok === true
+      ).length;
+      data = {
+        ok: true,
+        command,
+        input: inputValue,
+        tools_total: toolsTotal,
+        tools_ok: doneEvent?.tools_ok ?? okEntries,
+        results: { ...toolResults },
+        took_ms: elapsed,
+        streaming: !doneEvent,
+      };
+    } else {
+      // Username-режим: results.usersearcher.sites
+      const checked = stats?.checked ?? 0;
+      const hits = stats?.hits ?? sites.length;
+      data = {
+        ok: true,
+        command: "username",
+        input: username,
+        tools_total: 1,
+        tools_ok: 1,
+        results: {
+          usersearcher: {
+            ok: true,
+            found: `${hits} sites`,
+            sites: sites.slice(),
+            checked_total: checked,
+            errors: stats?.errors ?? 0,
+          },
         },
-      },
-      text: `✓ usersearcher → ${hits}/${total}`,
-      took_ms: elapsed,
-      streaming: !doneEvent,
-    };
+        text: `✓ usersearcher → ${hits}/${total}`,
+        took_ms: elapsed,
+        streaming: !doneEvent,
+      };
+    }
+
     return {
       status: res.status,
       statusText: res.statusText,
@@ -327,8 +363,16 @@ async function consumeSSE(args: {
       return;
     }
     if (ev.type === "start") {
-      total = ev.total;
-      username = ev.username;
+      // Распознаём режим: command присутствует → fanout, иначе username
+      if (typeof ev.command === "string" && ev.command.length > 0) {
+        mode = "fanout";
+        command = ev.command;
+        inputValue = ev.input ?? null;
+      } else {
+        mode = "username";
+        username = ev.username ?? "";
+      }
+      total = ev.total ?? ev.tools_total ?? 0;
     } else if (ev.type === "hit") {
       sites.push({
         site: ev.site.name,
@@ -339,12 +383,18 @@ async function consumeSSE(args: {
         source: ev.site.source,
         exists: true,
       });
+    } else if (ev.type === "tool") {
+      mode = "fanout";
+      toolResults[ev.name] = ev.result;
     } else if (ev.type === "progress") {
       lastProgress = {
         checked: ev.checked,
+        completed: ev.completed,
         hits: ev.hits,
+        ok: ev.ok,
         errors: ev.errors,
         elapsed_ms: ev.elapsed_ms,
+        total: ev.total,
       };
     } else if (ev.type === "done") {
       doneEvent = ev;
