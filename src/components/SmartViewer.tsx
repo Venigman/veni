@@ -928,6 +928,16 @@ function OsintToolBody({ result }: { result: Record<string, unknown> }) {
   if (filtered.length === 0) {
     return <span className="pretty-muted">—</span>;
   }
+  // Универсальная эвристика: если ровно ОДНО значение и это массив
+  // объектов с полем url — рисуем сеткой карточек (как sites/links).
+  // Покрывает name (results/users/matches/authors/works/commits/...)
+  // — все они имеют единое поле url.
+  if (filtered.length === 1) {
+    const v = filtered[0][1];
+    if (Array.isArray(v) && v.length && isObj(v[0]) && typeof (v[0] as Record<string, unknown>).url === "string") {
+      return <UrlCardsGrid items={v as Array<Record<string, unknown>>} />;
+    }
+  }
   return (
     <div className="pretty-object">
       {filtered.map(([k, v]) => (
@@ -938,6 +948,65 @@ function OsintToolBody({ result }: { result: Record<string, unknown> }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Универсальная сетка карточек: для любого массива объектов с url.
+ *  Заголовок берёт из name/title/login/label, остальное — компактно ниже. */
+function UrlCardsGrid({ items }: { items: Array<Record<string, unknown>> }) {
+  const titleFor = (it: Record<string, unknown>): string => {
+    for (const k of ["name", "title", "label", "login", "site", "hostname", "id"]) {
+      const v = it[k];
+      if (typeof v === "string" && v) return v;
+    }
+    return "?";
+  };
+  const subtitleFor = (it: Record<string, unknown>): string | null => {
+    for (const k of ["description", "bio", "post", "country", "year", "type", "date"]) {
+      const v = it[k];
+      if (typeof v === "string" && v) return v.length > 80 ? v.slice(0, 77) + "…" : v;
+      if (typeof v === "number") return String(v);
+    }
+    return null;
+  };
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 6 }}>
+      {items.map((it, i) => {
+        const url = typeof it.url === "string" ? it.url : "#";
+        const title = titleFor(it);
+        const sub = subtitleFor(it);
+        return (
+          <a
+            key={i}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              padding: "6px 10px",
+              border: "1px solid var(--border-muted)",
+              borderRadius: "var(--radius-sm)",
+              background: "var(--bg-overlay)",
+              color: "var(--text-primary)",
+              textDecoration: "none",
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+            }}
+          >
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <HL text={title} />
+            </span>
+            {sub && (
+              <span style={{ color: "var(--text-muted)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <HL text={sub} />
+              </span>
+            )}
+          </a>
+        );
+      })}
     </div>
   );
 }
