@@ -179,6 +179,23 @@ function findFileContent(
 // Context для пробрасывания поисковой строки во все view-компоненты.
 const SearchContext = createContext<string>("");
 
+/** Рекурсивно проверяет содержит ли value (любого типа) подстроку q.
+ *  Используется для фильтрации списков при поиске. */
+function valueMatches(value: unknown, q: string): boolean {
+  if (!q) return true;
+  const ql = q.toLowerCase();
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.toLowerCase().includes(ql);
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value).toLowerCase().includes(ql);
+  }
+  if (Array.isArray(value)) return value.some((v) => valueMatches(v, q));
+  if (typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).some((v) => valueMatches(v, q));
+  }
+  return false;
+}
+
 /** HL — оборачивает текст с подсветкой совпадений из SearchContext.
  *  Если поиск пуст или не нашло — рендерит текст как есть. */
 function HL({ text }: { text: string }) {
@@ -619,8 +636,13 @@ function TreeNode({
    TABLE VIEW
    ───────────────────────────────────────────── */
 function TableView({ rows }: { rows: unknown[] }) {
-  const cols = useMemo(() => collectColumns(rows, 8), [rows]);
+  const q = useContext(SearchContext);
+  const filtered = q ? rows.filter((r) => valueMatches(r, q)) : rows;
+  const cols = useMemo(() => collectColumns(filtered, 8), [filtered]);
   const [expanded, setExpanded] = useState<number | null>(null);
+  if (filtered.length === 0 && q) {
+    return <div className="pretty-muted" style={{ padding: 12 }}>нет совпадений</div>;
+  }
 
   return (
     <div
@@ -643,7 +665,7 @@ function TableView({ rows }: { rows: unknown[] }) {
           fontWeight: 600,
         }}
       >
-        {rows.length} {rows.length === 1 ? "row" : "rows"} · {cols.length}{" "}
+        {filtered.length} {filtered.length === 1 ? "row" : "rows"} · {cols.length}{" "}
         {cols.length === 1 ? "column" : "columns"}
       </div>
       <div style={{ overflowX: "auto" }}>
@@ -666,7 +688,7 @@ function TableView({ rows }: { rows: unknown[] }) {
             </tr>
           </thead>
           <tbody>
-            {rows.flatMap((row, i) => {
+            {filtered.flatMap((row, i) => {
               const obj =
                 row && typeof row === "object" && !Array.isArray(row)
                   ? (row as Record<string, unknown>)
@@ -980,9 +1002,14 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 
 function SitesList({ items }: { items: Array<Record<string, unknown>> }) {
+  const q = useContext(SearchContext);
+  const filtered = q ? items.filter((it) => valueMatches(it, q)) : items;
+  if (filtered.length === 0 && q) {
+    return <span className="pretty-muted">нет совпадений</span>;
+  }
   // Группируем по category, сортируем по CATEGORY_ORDER
   const groups = new Map<string, Array<Record<string, unknown>>>();
-  for (const item of items) {
+  for (const item of filtered) {
     const cat = typeof item.category === "string" ? item.category : "other";
     if (!groups.has(cat)) groups.set(cat, []);
     groups.get(cat)!.push(item);
@@ -1065,9 +1092,14 @@ function SitesList({ items }: { items: Array<Record<string, unknown>> }) {
 }
 
 function CategorizedLinks({ items }: { items: Array<Record<string, unknown>> }) {
+  const q = useContext(SearchContext);
+  const filtered = q ? items.filter((it) => valueMatches(it, q)) : items;
+  if (filtered.length === 0 && q) {
+    return <span className="pretty-muted">нет совпадений</span>;
+  }
   // group by category, preserve insertion order
   const groups = new Map<string, Array<Record<string, unknown>>>();
-  for (const it of items) {
+  for (const it of filtered) {
     const cat = typeof it.category === "string" ? it.category : "Other";
     if (!groups.has(cat)) groups.set(cat, []);
     groups.get(cat)!.push(it);
@@ -1275,6 +1307,23 @@ function GithubProfile({ profile }: { profile: Record<string, unknown> }) {
   );
 }
 
+function FilteredArray({ items }: { items: unknown[] }) {
+  const q = useContext(SearchContext);
+  const filtered = q ? items.filter((v) => valueMatches(v, q)) : items;
+  if (filtered.length === 0 && q) {
+    return <span className="pretty-muted">нет совпадений</span>;
+  }
+  return (
+    <div className="pretty-list">
+      {filtered.map((item, i) => (
+        <div key={i} className="pretty-list-item">
+          <PrettyAny value={item} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function PrettyAny({ value }: { value: unknown }) {
   if (value === null || value === undefined) {
     return <span className="pretty-muted">—</span>;
@@ -1287,15 +1336,7 @@ function PrettyAny({ value }: { value: unknown }) {
   }
   if (Array.isArray(value)) {
     if (value.length === 0) return <span className="pretty-muted">пусто</span>;
-    return (
-      <div className="pretty-list">
-        {value.map((item, i) => (
-          <div key={i} className="pretty-list-item">
-            <PrettyAny value={item} />
-          </div>
-        ))}
-      </div>
-    );
+    return <FilteredArray items={value} />;
   }
   if (typeof value === "object") {
     // 1) Fan-out форма: {tools_total, tools_ok, results: {tool: {...}}}
