@@ -802,7 +802,14 @@ function PrettyView({
 }
 
 function FanOutView({ data }: { data: FanOutResult }) {
-  const entries = Object.entries(data.results);
+  const q = useContext(SearchContext);
+  const allEntries = Object.entries(data.results);
+  // При активном поиске прячем тулзы у которых нет совпадений —
+  // блоки с матчами окажутся вверху без скролла.
+  const entries = q
+    ? allEntries.filter(([name, r]) => valueMatches(name, q) || valueMatches(r, q))
+    : allEntries;
+
   // Если у любого результата есть поле `country` — группируем по нему.
   // Универсально: любой бэк с тулзами + country-полем получит группировку.
   const hasCountry = entries.some(
