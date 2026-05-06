@@ -834,6 +834,11 @@ function OsintToolBody({ result }: { result: Record<string, unknown> }) {
       </div>
     );
   }
+  // 1.5. ua-name/quick_links — массив [{category, name, url}]
+  const links = result.links;
+  if (Array.isArray(links) && links.length && isObj(links[0]) && typeof (links[0] as Record<string, unknown>).url === "string" && typeof (links[0] as Record<string, unknown>).category === "string") {
+    return <CategorizedLinks items={links as Array<Record<string, unknown>>} />;
+  }
   // 2. domain/crtsh — массив subdomains: ["a.example.com", ...]
   const subdomains = result.subdomains;
   if (Array.isArray(subdomains) && subdomains.length && typeof subdomains[0] === "string") {
@@ -1003,6 +1008,61 @@ function SitesList({ items }: { items: Array<Record<string, unknown>> }) {
                       {badge.label}
                     </span>
                   )}
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CategorizedLinks({ items }: { items: Array<Record<string, unknown>> }) {
+  // group by category, preserve insertion order
+  const groups = new Map<string, Array<Record<string, unknown>>>();
+  for (const it of items) {
+    const cat = typeof it.category === "string" ? it.category : "Other";
+    if (!groups.has(cat)) groups.set(cat, []);
+    groups.get(cat)!.push(it);
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {[...groups.entries()].map(([cat, links]) => (
+        <div key={cat}>
+          <div
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700,
+              letterSpacing: "0.05em", textTransform: "uppercase",
+              color: "var(--text-muted)", marginBottom: 6,
+            }}
+          >
+            <span>{cat}</span>
+            <span style={{ color: "var(--text-secondary)" }}>{links.length}</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 6 }}>
+            {links.map((l, i) => {
+              const name = typeof l.name === "string" ? l.name : "?";
+              const url = typeof l.url === "string" ? l.url : "#";
+              return (
+                <a
+                  key={i}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    padding: "6px 10px",
+                    border: "1px solid var(--border-muted)",
+                    borderRadius: "var(--radius-sm)",
+                    background: "var(--bg-overlay)",
+                    color: "var(--text-primary)",
+                    textDecoration: "none",
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 11,
+                  }}
+                >
+                  {name}
                 </a>
               );
             })}
